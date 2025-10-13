@@ -2,13 +2,17 @@
 
 
 
-[![Version](https://img.shields.io/badge/version-0.0.1--alpha-blue.svg)](CHANGELOG.md)[![Version](## 📖 Документация
+[![Version](https://img.shields.io/badge/version-0.0.1--alpha-blue.svg)](CHANGELOG.md)
 
 [![Status](https://img.shields.io/badge/status-alpha-yellow.svg)](ROADMAP.md)
 
-[![Python](https://img.shields.io/badge/python-3.11+-green.svg)](https://python.org)- **[CHANGELOG.md](CHANGELOG.md)** - История изменений
+[![Python](https://img.shields.io/badge/python-3.11+-green.svg)](https://python.org)
 
-[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)- **[ROADMAP.md](ROADMAP.md)** - Планы развития
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+
+- **[CHANGELOG.md](CHANGELOG.md)** - История изменений
+
+- **[ROADMAP.md](ROADMAP.md)** - Планы развития
 
 - **[ALPHA_RELEASE.md](ALPHA_RELEASE.md)** - Анонс релиза Alpha v0.0.1
 
