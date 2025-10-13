@@ -1,0 +1,31 @@
+# AI Agent - Зависимости проекта
+
+# LLM и векторная память
+llama-cpp-python>=0.3.0
+faiss-cpu>=1.8.0
+sentence-transformers>=2.2.0
+
+# CLI и UI
+rich>=13.0.0
+prompt-toolkit>=3.0.0
+
+# Веб-запросы и парсинг
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
+dnspython>=2.4.0  # Для обхода mDNS в Kali Linux
+
+# Google API (опционально, для internet_search)
+google-api-python-client>=2.100.0
+httplib2>=0.22.0
+
+# Тестирование
+pytest>=7.4.0
+pytest-mock>=3.12.0
+
+# Переменные окружения
+python-dotenv>=1.0.0
+
+# Научные вычисления (зависимости для sentence-transformers)
+numpy>=1.24.0
+torch>=2.0.0
