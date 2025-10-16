@@ -7,7 +7,7 @@ v3.0.0: Поддержка флагового формата для решени
 import json
 import re
 import logging
-from typing import Dict, Optional
+from typing import Dict
 
 logger = logging.getLogger(__name__)
 
@@ -82,10 +82,10 @@ def parse_flagged_response(response: str) -> Dict:
         if tool_pos > 0:
             pre_tool_text = response[:tool_pos].strip()
             if pre_tool_text:
-                logger.warning(f"⚠️ <THOUGHT> тег отсутствует, восстанавливаем из текста перед <TOOL>: '{pre_tool_text[:50]}...'")
+                logger.warning("⚠️ <THOUGHT> тег отсутствует, восстанавливаем из текста перед <TOOL>: '%s...'", pre_tool_text[:50])
                 thought = pre_tool_text
             else:
-                logger.warning(f"⚠️ <THOUGHT> тег отсутствует и нет текста перед <TOOL>, используем заглушку")
+                logger.warning("⚠️ <THOUGHT> тег отсутствует и нет текста перед <TOOL>, используем заглушку")
                 thought = f"[Рассуждение отсутствует, используется инструмент {tool_name}]"
         else:
             thought = f"[Рассуждение отсутствует, используется инструмент {tool_name}]"

@@ -51,7 +51,7 @@ if __name__ == "__main__":
     def test_case_2_regex_patterns(self):
         """Кейс 2: Regex паттерны (проблемный в v2.1.2) 🔥"""
         
-        response = """<THOUGHT>
+        response = r"""<THOUGHT>
 Создам скрипт с regex для валидации email адресов
 <TOOL>
 write_file
@@ -89,7 +89,7 @@ for email in test_emails:
     def test_case_3_json_inside_code(self):
         """Кейс 3: JSON внутри кода (двойные проблемы с escaping) 🔥"""
         
-        response = """<THOUGHT>
+        response = r"""<THOUGHT>
 Создам скрипт для работы с JSON
 <TOOL>
 write_file

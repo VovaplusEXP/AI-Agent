@@ -1,6 +1,6 @@
 # context_manager.py
 import logging
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Tuple
 
 logger = logging.getLogger(__name__)
 

@@ -8,7 +8,6 @@ import os
 import subprocess
 from pathlib import Path
 import requests
-from requests.adapters import HTTPAdapter
 from urllib3.util.connection import create_connection
 from bs4 import BeautifulSoup
 import logging
@@ -79,7 +78,6 @@ def _resolve_dns_fast(hostname: str) -> str:
         resolver = _init_custom_resolver()
         if resolver:
             try:
-                import dns.resolver
                 # Резолвим A-запись (IPv4)
                 answers = resolver.resolve(hostname, 'A')
                 ip = str(answers[0])
@@ -91,7 +89,6 @@ def _resolve_dns_fast(hostname: str) -> str:
         
         # Метод 2: socket.getaddrinfo с AF_INET (fallback)
         try:
-            import socket
             # AF_INET заставляет использовать только IPv4 DNS
             result = socket.getaddrinfo(hostname, None, socket.AF_INET, socket.SOCK_STREAM)
             ip = str(result[0][4][0])
@@ -505,7 +502,7 @@ def replace_in_file(file_path: str, old_string: str, new_string: str) -> str:
             return f"Ошибка: Файл не найден по пути '{file_path}'."
         original_content = path_obj.read_text(encoding='utf-8')
         if old_string not in original_content:
-            return f"Информация: Строка для замены не найдена. Файл не изменен."
+            return "Информация: Строка для замены не найдена. Файл не изменен."
         new_content = original_content.replace(old_string, new_string)
         path_obj.write_text(new_content, encoding='utf-8')
         return f"Замена в файле '{file_path}' успешно выполнена."

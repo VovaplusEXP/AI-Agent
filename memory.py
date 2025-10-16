@@ -30,7 +30,7 @@ class EmbeddingModelSingleton:
                 # Если модели нет - упадёт с ошибкой, тогда загрузим с интернета
                 try:
                     cls._model = SentenceTransformer(model_name, local_files_only=True)
-                    logger.info(f"Модель загружена из локального кэша")
+                    logger.info("Модель загружена из локального кэша")
                 except Exception as local_err:
                     logger.info(f"Локальный кэш не найден, загружаем из интернета: {local_err}")
                     cls._model = SentenceTransformer(model_name, local_files_only=False)
