@@ -1,6 +1,4 @@
-import time
 import json
-import shutil
 import inspect
 import logging
 import re
@@ -717,12 +715,12 @@ no
         stats = self.memory_manager.get_all_stats()
         
         lines = ["📊 Статистика памяти:"]
-        lines.append(f"\n📚 Глобальная память:")
+        lines.append("\n📚 Глобальная память:")
         lines.append(f"  - Записей: {stats['global']['total_entries']}")
         lines.append(f"  - Путь: {stats['global']['storage_path']}")
         
         if stats['projects']:
-            lines.append(f"\n🔬 Проектные памяти:")
+            lines.append("\n🔬 Проектные памяти:")
             for name, proj_stats in stats['projects'].items():
                 lines.append(f"  - {name}: {proj_stats['total_entries']} записей")
         

@@ -51,7 +51,7 @@ if __name__ == "__main__":
     def test_case_2_regex_patterns(self):
         """Кейс 2: Regex паттерны (проблемный в v2.1.2) 🔥"""
         
-        response = """<THOUGHT>
+        response = r"""<THOUGHT>
 Создам скрипт с regex для валидации email адресов
 <TOOL>
 write_file
@@ -89,7 +89,7 @@ for email in test_emails:
     def test_case_3_json_inside_code(self):
         """Кейс 3: JSON внутри кода (двойные проблемы с escaping) 🔥"""
         
-        response = """<THOUGHT>
+        response = r"""<THOUGHT>
 Создам скрипт для работы с JSON
 <TOOL>
 write_file
@@ -229,7 +229,7 @@ get_current_time
         assert 'content' not in result['parameters'] or result['parameters']['content'] == ""
     
     def test_missing_required_thought(self):
-        """Edge case: Отсутствие обязательного блока <THOUGHT>"""
+        """Edge case: Отсутствие <THOUGHT> - парсер должен восстановить"""
         
         response = """<TOOL>
 write_file
@@ -237,8 +237,11 @@ write_file
 {"file_path": "test.py"}
 <END>"""
         
-        with pytest.raises(ValueError, match="отсутствуют обязательные флаги"):
-            parse_flagged_response(response)
+        # Парсер v3.0.0 ВОССТАНАВЛИВАЕТ отсутствующий thought
+        result = parse_flagged_response(response)
+        assert result['tool_name'] == 'write_file'
+        # Thought будет восстановлен как текст до <TOOL> или заглушка
+        assert 'write_file' in result['thought']
     
     def test_missing_required_tool(self):
         """Edge case: Отсутствие обязательного блока <TOOL>"""
@@ -249,7 +252,7 @@ write_file
 {"file_path": "test.py"}
 <END>"""
         
-        with pytest.raises(ValueError, match="отсутствуют обязательные флаги"):
+        with pytest.raises(ValueError, match="отсутствует обязательный флаг <TOOL>"):
             parse_flagged_response(response)
     
     def test_invalid_json_in_params(self):
@@ -337,7 +340,7 @@ print("Hello")
         assert 'print("Hello")' in result['parameters']['content']
     
     def test_fallback_to_json_when_flags_fail(self):
-        """Fallback на JSON когда флаги не распознаны"""
+        """v3.1.0: JSON fallback УДАЛЁН - должна быть ошибка"""
         
         response = """{
     "thought": "Создать файл",
@@ -350,11 +353,9 @@ print("Hello")
     }
 }"""
         
-        result = parse_response_with_fallback(response)
-        
-        assert result['thought'] == "Создать файл"
-        assert result['tool_name'] == "write_file"
-        assert result['parameters']['file_path'] == "test.py"
+        # v3.1.0: Fallback на JSON удалён, должна быть ошибка
+        with pytest.raises(ValueError, match="ФОРМАТ НЕВЕРНЫЙ"):
+            parse_response_with_fallback(response)
     
     def test_fallback_fails_on_both_formats(self):
         """Fallback выбрасывает ошибку если оба формата невалидны"""

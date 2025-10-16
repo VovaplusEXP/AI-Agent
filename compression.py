@@ -10,7 +10,7 @@
 
 import re
 import logging
-from typing import List, Dict, Tuple
+from typing import List, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -114,20 +114,20 @@ def compress_history_smart(
             'КРИТИЧЕСКАЯ ОШИБКА ФОРМАТА'
         ]):
             duplicates_removed += 1
-            logger.debug(f"🧹 Удалена ошибка формата")
+            logger.debug("🧹 Удалена ошибка формата")
             continue
         
         # Пропускаем пустые Observation
         if content.strip() in ['Observation:', 'Observation: ']:
             duplicates_removed += 1
-            logger.debug(f"🧹 Удалён пустой Observation")
+            logger.debug("🧹 Удалён пустой Observation")
             continue
         
         # Проверка на дубликаты (по первым 200 символам)
         content_hash = content[:200]
         if content_hash in seen_hashes:
             duplicates_removed += 1
-            logger.debug(f"🧹 Удалён дубликат")
+            logger.debug("🧹 Удалён дубликат")
             continue
         
         seen_hashes.add(content_hash)

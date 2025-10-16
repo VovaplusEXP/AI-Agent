@@ -1,4 +1,3 @@
-import time
 import os
 import logging
 import subprocess
@@ -7,7 +6,6 @@ from agent import Agent
 
 from rich.console import Console
 from rich.markdown import Markdown
-from rich.live import Live
 from rich.panel import Panel
 
 from prompt_toolkit import PromptSession
@@ -120,7 +118,7 @@ class RichCLI:
             self.show_help()
             
         else:
-            self.console.print(f"[red]Неизвестная команда или неверный аргумент. Введите /help.[/red]")
+            self.console.print("[red]Неизвестная команда или неверный аргумент. Введите /help.[/red]")
 
     def handle_shell_command(self, command: str):
         """Выполняет команду оболочки."""
