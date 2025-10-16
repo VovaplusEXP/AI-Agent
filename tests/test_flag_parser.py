@@ -229,7 +229,7 @@ get_current_time
         assert 'content' not in result['parameters'] or result['parameters']['content'] == ""
     
     def test_missing_required_thought(self):
-        """Edge case: Отсутствие обязательного блока <THOUGHT>"""
+        """Edge case: Отсутствие <THOUGHT> - парсер должен восстановить"""
         
         response = """<TOOL>
 write_file
@@ -237,8 +237,11 @@ write_file
 {"file_path": "test.py"}
 <END>"""
         
-        with pytest.raises(ValueError, match="отсутствуют обязательные флаги"):
-            parse_flagged_response(response)
+        # Парсер v3.0.0 ВОССТАНАВЛИВАЕТ отсутствующий thought
+        result = parse_flagged_response(response)
+        assert result['tool_name'] == 'write_file'
+        # Thought будет восстановлен как текст до <TOOL> или заглушка
+        assert 'write_file' in result['thought']
     
     def test_missing_required_tool(self):
         """Edge case: Отсутствие обязательного блока <TOOL>"""
@@ -249,7 +252,7 @@ write_file
 {"file_path": "test.py"}
 <END>"""
         
-        with pytest.raises(ValueError, match="отсутствуют обязательные флаги"):
+        with pytest.raises(ValueError, match="отсутствует обязательный флаг <TOOL>"):
             parse_flagged_response(response)
     
     def test_invalid_json_in_params(self):
