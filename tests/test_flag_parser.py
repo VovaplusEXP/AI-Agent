@@ -340,7 +340,7 @@ print("Hello")
         assert 'print("Hello")' in result['parameters']['content']
     
     def test_fallback_to_json_when_flags_fail(self):
-        """Fallback на JSON когда флаги не распознаны"""
+        """v3.1.0: JSON fallback УДАЛЁН - должна быть ошибка"""
         
         response = """{
     "thought": "Создать файл",
@@ -353,11 +353,9 @@ print("Hello")
     }
 }"""
         
-        result = parse_response_with_fallback(response)
-        
-        assert result['thought'] == "Создать файл"
-        assert result['tool_name'] == "write_file"
-        assert result['parameters']['file_path'] == "test.py"
+        # v3.1.0: Fallback на JSON удалён, должна быть ошибка
+        with pytest.raises(ValueError, match="ФОРМАТ НЕВЕРНЫЙ"):
+            parse_response_with_fallback(response)
     
     def test_fallback_fails_on_both_formats(self):
         """Fallback выбрасывает ошибку если оба формата невалидны"""
