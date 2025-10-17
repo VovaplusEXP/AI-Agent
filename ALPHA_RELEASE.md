@@ -220,7 +220,7 @@ MIT License - см. [LICENSE](LICENSE)
 
 **🎉 Добро пожаловать в эру автономного AI! 🎉**
 
-**v0.0.1-alpha** | 2025-10-13
+**v0.0.2-alpha** | 2025-10-17
 
 [Документация](doc/DOCUMENTATION.md) • [Changelog](CHANGELOG.md) • [Roadmap](ROADMAP.md)
 
