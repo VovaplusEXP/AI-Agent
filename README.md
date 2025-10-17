@@ -1,6 +1,6 @@
 # 🤖 AI Agent - ReAct агент с автономным рассуждением
 
-[![Version](https://img.shields.io/badge/version-0.0.1--alpha-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.0.2--alpha-blue.svg)](CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-alpha-yellow.svg)](ROADMAP.md)
 [![Python](https://img.shields.io/badge/python-3.11+-green.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
@@ -13,7 +13,7 @@
 
 - **[CHANGELOG.md](CHANGELOG.md)** - История изменений
 - **[ROADMAP.md](ROADMAP.md)** - Планы развития
-- **[ALPHA_RELEASE.md](ALPHA_RELEASE.md)** - Анонс релиза Alpha v0.0.1
+- **[ALPHA_RELEASE.md](ALPHA_RELEASE.md)** - Анонс релиза Alpha v0.0.2
 - **[doc/](doc/)** - Техническая документация
   - [DOCUMENTATION.md](doc/DOCUMENTATION.md) - Детальная документация
   - [MASTER_DOCUMENTATION.md](doc/MASTER_DOCUMENTATION.md) - Полная документация (включая поддержку изображений и PDF)
@@ -36,7 +36,7 @@
 
 ---
 
-## ✨ Основные возможности (v0.0.1-alpha)
+## ✨ Основные возможности (v0.0.2-alpha)
 
 ### 🎯 ReAct цикл
 - **Автономное рассуждение:** Thought → Action → Observation
@@ -201,8 +201,9 @@ if __name__ == "__main__":
 - **MAJOR.MINOR.PATCH-stage**
 - **Stage:** `alpha` → `beta` → `rc` → `stable`
 
-### Текущий этап: Alpha (v0.0.1)
+### Текущий этап: Alpha (v0.0.2)
 - ✅ Основной функционал работает
+- ✅ Поддержка изображений и PDF
 - ⚠️ Возможны breaking changes
 - 🔬 Экспериментальные фичи
 
@@ -258,6 +259,6 @@ if __name__ == "__main__":
 
 [Документация](doc/DOCUMENTATION.md) • [Changelog](CHANGELOG.md) • [Roadmap](ROADMAP.md)
 
-**v0.0.1-alpha** | 2025-10-13
+**v0.0.2-alpha** | 2025-10-17
 
 </div>
