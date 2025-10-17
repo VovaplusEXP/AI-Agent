@@ -16,8 +16,7 @@
 - **[ALPHA_RELEASE.md](ALPHA_RELEASE.md)** - Анонс релиза Alpha v0.0.1
 - **[doc/](doc/)** - Техническая документация
   - [DOCUMENTATION.md](doc/DOCUMENTATION.md) - Детальная документация
-  - [MASTER_DOCUMENTATION.md](doc/MASTER_DOCUMENTATION.md) - Полная документация (800+ строк)
-  - [IMAGE_PDF_SUPPORT.md](doc/IMAGE_PDF_SUPPORT.md) - **НОВОЕ:** Поддержка изображений и PDF
+  - [MASTER_DOCUMENTATION.md](doc/MASTER_DOCUMENTATION.md) - Полная документация (включая поддержку изображений и PDF)
   - [PATCH_v3.3.1_SUMMARY.md](doc/PATCH_v3.3.1_SUMMARY.md) - Последний патч
   - [PATCH_v3.3.1_TEST_RESULTS.md](doc/PATCH_v3.3.1_TEST_RESULTS.md) - Результаты тестов
 
