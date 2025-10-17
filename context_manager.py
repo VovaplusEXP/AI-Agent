@@ -1,6 +1,7 @@
 # context_manager.py
 import logging
 from typing import List, Dict, Tuple
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -46,14 +47,43 @@ class ContextManager:
         }
     
     def count_tokens(self, text: str) -> int:
-        """Подсчитывает количество токенов в тексте."""
+        """
+        Подсчитывает количество токенов в тексте, включая обработку изображений.
+        
+        Изображения в формате [IMAGE_DATA:base64...] или [PAGE_X_IMAGE_DATA:base64...]
+        считаются с фиксированной стоимостью в токенах для оптимизации.
+        """
         if not text:
             return 0
+        
         try:
-            return len(self.llm.tokenize(text.encode('utf-8')))
+            # Извлекаем изображения из текста
+            image_pattern = r'\[(?:PAGE_\d+_)?IMAGE_DATA:[^\]]+\]'
+            images = re.findall(image_pattern, text)
+            
+            # Удаляем изображения из текста для подсчета токенов
+            text_without_images = re.sub(image_pattern, '', text)
+            
+            # Считаем токены текста
+            text_tokens = len(self.llm.tokenize(text_without_images.encode('utf-8')))
+            
+            # Для каждого изображения добавляем фиксированную стоимость
+            # Базовое изображение ~85 токенов для Vision модели
+            # Оптимизированное (512x512, quality=85) ~50-70 токенов
+            image_tokens = len(images) * 65  # Средняя оценка
+            
+            total_tokens = text_tokens + image_tokens
+            
+            if images:
+                logger.debug(f"Подсчет токенов: текст={text_tokens}, изображений={len(images)}x65={image_tokens}, итого={total_tokens}")
+            
+            return total_tokens
+            
         except Exception as e:
             logger.warning(f"Ошибка подсчета токенов: {e}, используем приблизительную оценку")
-            return int(len(text.split()) * 1.3)  # Примерная оценка
+            # Удаляем изображения для приблизительной оценки
+            text_without_images = re.sub(r'\[(?:PAGE_\d+_)?IMAGE_DATA:[^\]]+\]', '', text)
+            return int(len(text_without_images.split()) * 1.3)  # Примерная оценка
     
     def build_context(
         self,
@@ -70,6 +100,7 @@ class ContextManager:
         2. Приоритет 2 (важно): L3 память - адаптивно расширяется если есть место
         3. Приоритет 3 (гибко): L2 история - получает ВСЁ оставшееся место
         4. Перераспределение: свободные токены отдаются по приоритетам
+        5. НОВОЕ: При переполнении конкретного блока - сжимаем его вместо дропа сессии
         
         Args:
             system_prompt: Системный промпт
@@ -87,7 +118,8 @@ class ContextManager:
             'memory_tokens': 0,
             'history_tokens': 0,
             'trimmed_messages': 0,
-            'budget_redistribution': {}  # Новая метрика
+            'budget_redistribution': {},  # Метрика перераспределения
+            'blocks_compressed': 0  # НОВОЕ: счетчик сжатых блоков
         }
         
         # === ШАГ 1: Подсчёт КРИТИЧНЫХ компонентов (Приоритет 1) ===
@@ -147,11 +179,12 @@ class ContextManager:
         
         logger.debug(f"📊 Бюджет истории: {history_budget} токенов ({history_budget/self.max_tokens*100:.1f}%)")
         
-        # Обрезаем историю под бюджет
-        trimmed_history = self._trim_history(history, history_budget)
+        # Обрезаем историю под бюджет С КОМПРЕССИЕЙ БЛОКОВ
+        trimmed_history, blocks_compressed = self._trim_history_with_compression(history, history_budget)
         history_tokens = sum(self.count_tokens(msg.get('content', '')) for msg in trimmed_history)
         stats['history_tokens'] = history_tokens
         stats['trimmed_messages'] = len(history) - len(trimmed_history)
+        stats['blocks_compressed'] = blocks_compressed
         
         # Свободные токены (если история не заполнила весь бюджет)
         free_tokens = history_budget - history_tokens
@@ -181,6 +214,8 @@ class ContextManager:
         stats['utilization'] = (stats['total_tokens'] / self.max_tokens) * 100
         
         logger.debug(f"✅ Контекст собран: {stats['total_tokens']}/{self.max_tokens} токенов ({stats['utilization']:.1f}% использовано)")
+        if blocks_compressed > 0:
+            logger.info(f"🗜️ Сжато блоков при переполнении: {blocks_compressed}")
         
         return optimized_history, stats, enhanced_system_prompt
     
@@ -321,6 +356,75 @@ class ContextManager:
                 break
         
         return trimmed
+    
+    def _trim_history_with_compression(self, history: List[Dict], token_budget: int) -> Tuple[List[Dict], int]:
+        """
+        НОВЫЙ метод: Умная обрезка истории с компрессией переполняющих блоков.
+        
+        Вместо простого удаления сообщений, сжимает те, что не входят в бюджет.
+        
+        Args:
+            history: История диалога
+            token_budget: Доступный бюджет токенов
+            
+        Returns:
+            Tuple[обрезанная история, количество сжатых блоков]
+        """
+        if not history:
+            return [], 0
+        
+        from compression import compress_block_on_overflow
+        
+        trimmed = []
+        current_tokens = 0
+        blocks_compressed = 0
+        
+        # Обрабатываем сообщения с конца (последние = самые важные)
+        for msg in reversed(history):
+            msg_tokens = self.count_tokens(msg.get('content', ''))
+            
+            # Если сообщение входит в бюджет - добавляем как есть
+            if current_tokens + msg_tokens <= token_budget:
+                trimmed.insert(0, msg)
+                current_tokens += msg_tokens
+            else:
+                # Сообщение не входит в бюджет
+                remaining_budget = token_budget - current_tokens
+                
+                # Если осталось хотя бы 20% бюджета - пытаемся сжать блок
+                if remaining_budget > token_budget * 0.2 and msg_tokens > remaining_budget:
+                    logger.info(f"🗜️ Сжимаем блок: {msg_tokens} токенов → цель {remaining_budget}")
+                    
+                    # Сжимаем блок под оставшийся бюджет
+                    compressed_content = compress_block_on_overflow(
+                        block_content=msg.get('content', ''),
+                        llm=self.llm,
+                        max_tokens=remaining_budget,
+                        preserve_images=True
+                    )
+                    
+                    compressed_msg = msg.copy()
+                    compressed_msg['content'] = compressed_content
+                    
+                    compressed_tokens = self.count_tokens(compressed_content)
+                    
+                    if compressed_tokens <= remaining_budget:
+                        trimmed.insert(0, compressed_msg)
+                        current_tokens += compressed_tokens
+                        blocks_compressed += 1
+                        logger.info(f"✅ Блок сжат и добавлен: {msg_tokens} → {compressed_tokens} токенов")
+                    else:
+                        # Даже после сжатия не входит - пропускаем
+                        logger.warning(f"⚠️ Блок не влез даже после сжатия: {compressed_tokens} > {remaining_budget}")
+                        break
+                else:
+                    # Недостаточно места даже для сжатия - останавливаемся
+                    logger.debug(f"⚠️ Недостаточно места для блока ({remaining_budget} < 20% бюджета)")
+                    break
+        
+        logger.debug(f"📊 Обрезка завершена: {len(history)} → {len(trimmed)} сообщений, сжато блоков: {blocks_compressed}")
+        
+        return trimmed, blocks_compressed
     
     def get_context_stats(self, history: List[Dict], system_prompt: str = "") -> Dict:
         """Возвращает статистику текущего контекста."""
