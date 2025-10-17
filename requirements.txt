@@ -29,3 +29,8 @@ python-dotenv>=1.0.0
 # Научные вычисления (зависимости для sentence-transformers)
 numpy>=1.24.0
 torch>=2.0.0
+
+# Обработка изображений и PDF
+Pillow>=10.0.0
+pdf2image>=1.16.0
+pypdfium2>=4.0.0

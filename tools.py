@@ -12,6 +12,9 @@ from urllib3.util.connection import create_connection
 from bs4 import BeautifulSoup
 import logging
 import socket
+import base64
+import io
+from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -394,6 +397,121 @@ _web_page_cache = {}  # Кэш веб-страниц
 _embedding_model = None  # Кэш модели эмбеддингов (загружается при первом использовании)
 
 
+def _optimize_image_for_vision(image_path: str, max_size: Tuple[int, int] = (512, 512), quality: int = 85) -> Optional[str]:
+    """
+    Оптимизирует изображение для уменьшения количества токенов.
+    
+    Стратегия оптимизации:
+    - Изменение размера до max_size с сохранением пропорций
+    - Сжатие JPEG с заданным качеством
+    - Конвертация в base64 для передачи в LLM
+    
+    Args:
+        image_path: Путь к изображению
+        max_size: Максимальный размер (ширина, высота)
+        quality: Качество JPEG (1-100)
+        
+    Returns:
+        Base64-строка оптимизированного изображения или None при ошибке
+    """
+    try:
+        from PIL import Image
+        
+        # Открываем изображение
+        img = Image.open(image_path)
+        
+        # Конвертируем в RGB если необходимо
+        if img.mode in ('RGBA', 'LA', 'P'):
+            background = Image.new('RGB', img.size, (255, 255, 255))
+            if img.mode == 'P':
+                img = img.convert('RGBA')
+            background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+            img = background
+        elif img.mode != 'RGB':
+            img = img.convert('RGB')
+        
+        # Изменяем размер с сохранением пропорций
+        img.thumbnail(max_size, Image.Resampling.LANCZOS)
+        
+        # Сохраняем в буфер с оптимизацией
+        buffer = io.BytesIO()
+        img.save(buffer, format='JPEG', quality=quality, optimize=True)
+        buffer.seek(0)
+        
+        # Кодируем в base64
+        img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+        
+        logger.info(f"Изображение оптимизировано: {image_path}, размер: {img.size}, base64 длина: {len(img_base64)}")
+        
+        return img_base64
+        
+    except ImportError:
+        logger.error("Pillow не установлен. Установите: pip install Pillow")
+        return None
+    except Exception as e:
+        logger.error(f"Ошибка оптимизации изображения: {e}")
+        return None
+
+
+def _read_pdf_as_images(pdf_path: str, max_pages: int = 10) -> list:
+    """
+    Читает PDF файл и конвертирует страницы в изображения.
+    
+    Args:
+        pdf_path: Путь к PDF файлу
+        max_pages: Максимальное количество страниц для обработки
+        
+    Returns:
+        Список base64-строк изображений страниц
+    """
+    try:
+        import pypdfium2 as pdfium
+        from PIL import Image
+        
+        images = []
+        pdf = pdfium.PdfDocument(pdf_path)
+        
+        # Ограничиваем количество страниц
+        page_count = min(len(pdf), max_pages)
+        
+        for page_num in range(page_count):
+            page = pdf[page_num]
+            
+            # Рендерим страницу в изображение (150 DPI для баланса качества/размера)
+            pil_image = page.render(scale=150/72).to_pil()
+            
+            # Оптимизируем изображение
+            pil_image.thumbnail((512, 512), Image.Resampling.LANCZOS)
+            
+            # Конвертируем в RGB
+            if pil_image.mode != 'RGB':
+                pil_image = pil_image.convert('RGB')
+            
+            # Сохраняем в буфер
+            buffer = io.BytesIO()
+            pil_image.save(buffer, format='JPEG', quality=85, optimize=True)
+            buffer.seek(0)
+            
+            # Кодируем в base64
+            img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+            images.append(img_base64)
+            
+            logger.debug(f"PDF страница {page_num + 1}/{page_count} обработана")
+        
+        pdf.close()
+        
+        logger.info(f"PDF обработан: {pdf_path}, страниц: {page_count}")
+        return images
+        
+    except ImportError as e:
+        logger.error(f"Необходимые библиотеки не установлены: {e}")
+        logger.error("Установите: pip install pypdfium2 Pillow")
+        return []
+    except Exception as e:
+        logger.error(f"Ошибка чтения PDF: {e}")
+        return []
+
+
 def list_directory(path: str = '.') -> str:
     """
     Возвращает список файлов и директорий по указанному пути, разделенный переносами строк. Используй для обзора содержимого директории.
@@ -414,7 +532,13 @@ def list_directory(path: str = '.') -> str:
 
 def read_file(file_path: str) -> str:
     """
-    Читает и возвращает полное содержимое ЛОКАЛЬНОГО текстового файла. 
+    Читает и возвращает содержимое ЛОКАЛЬНОГО файла.
+    Поддерживает текстовые файлы, изображения и PDF-документы.
+    
+    Для изображений (JPEG, PNG, GIF, BMP, TIFF, WebP): возвращает описание и оптимизированное изображение.
+    Для PDF: конвертирует страницы в изображения.
+    Для текстовых файлов: возвращает полное содержимое.
+    
     ⚠️ НЕ ИСПОЛЬЗУЙ для URL-адресов! Для веб-страниц используй web_fetch, web_get_structure или web_search_in_page.
 
     Args:
@@ -437,10 +561,63 @@ def read_file(file_path: str) -> str:
         )
     
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            return f.read()
-    except FileNotFoundError:
-        return f"Ошибка: Файл не найден по пути '{file_path}'."
+        file_path_obj = Path(file_path)
+        
+        if not file_path_obj.exists():
+            return f"Ошибка: Файл не найден по пути '{file_path}'."
+        
+        # Определяем тип файла по расширению
+        suffix = file_path_obj.suffix.lower()
+        
+        # Обработка изображений
+        if suffix in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.webp']:
+            logger.info(f"Обработка изображения: {file_path}")
+            
+            # Оптимизируем изображение
+            img_base64 = _optimize_image_for_vision(file_path)
+            
+            if img_base64 is None:
+                return f"Ошибка: Не удалось обработать изображение '{file_path}'. Убедитесь, что установлен Pillow."
+            
+            # Получаем информацию о файле
+            file_size = file_path_obj.stat().st_size
+            file_size_kb = file_size / 1024
+            
+            return (
+                f"📷 ИЗОБРАЖЕНИЕ: {file_path_obj.name}\n"
+                f"Размер файла: {file_size_kb:.2f} КБ\n"
+                f"Формат: {suffix[1:].upper()}\n"
+                f"Изображение оптимизировано и готово для анализа.\n\n"
+                f"[IMAGE_DATA:{img_base64}]"
+            )
+        
+        # Обработка PDF
+        elif suffix == '.pdf':
+            logger.info(f"Обработка PDF: {file_path}")
+            
+            images = _read_pdf_as_images(file_path, max_pages=10)
+            
+            if not images:
+                return f"Ошибка: Не удалось обработать PDF '{file_path}'. Убедитесь, что установлены pypdfium2 и Pillow."
+            
+            result = [
+                f"📄 PDF ДОКУМЕНТ: {file_path_obj.name}",
+                f"Страниц обработано: {len(images)}",
+                f"Каждая страница конвертирована в оптимизированное изображение.\n"
+            ]
+            
+            for i, img_base64 in enumerate(images, 1):
+                result.append(f"[PAGE_{i}_IMAGE_DATA:{img_base64}]")
+            
+            return "\n".join(result)
+        
+        # Обработка текстовых файлов
+        else:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read()
+                
+    except UnicodeDecodeError:
+        return f"Ошибка: Файл '{file_path}' не является текстовым файлом или использует неподдерживаемую кодировку."
     except Exception as e:
         return f"Ошибка при чтении файла: {e}"
 

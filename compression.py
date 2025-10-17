@@ -4,8 +4,10 @@
 
 Основные функции:
 - compress_history_smart(): Главная функция сжатия истории
+- compress_block_on_overflow(): Сжатие конкретного блока при переполнении
 - _summarize_observation(): Сжатие длинных Observation через LLM
 - _extract_key_facts(): Извлечение ключевых фактов (URL, файлы, версии)
+- _compress_images(): Сжатие изображений в сообщениях
 """
 
 import re
@@ -13,6 +15,118 @@ import logging
 from typing import List, Dict
 
 logger = logging.getLogger(__name__)
+
+
+def compress_block_on_overflow(
+    block_content: str,
+    llm,
+    max_tokens: int = 2048,
+    preserve_images: bool = True
+) -> str:
+    """
+    Сжимает конкретный блок контента при переполнении лимита токенов.
+    Вместо дропа всей сессии сжимает только переполняющий блок.
+    
+    Стратегия:
+    1. Если есть изображения - оптимизируем/удаляем избыточные
+    2. Если есть длинный текст - сжимаем через LLM
+    3. Извлекаем только ключевые факты
+    
+    Args:
+        block_content: Содержимое блока для сжатия
+        llm: Экземпляр LLM для суммаризации
+        max_tokens: Максимальное количество токенов для блока
+        preserve_images: Сохранять ли изображения (если False - удаляются)
+        
+    Returns:
+        Сжатое содержимое блока
+    """
+    logger.info(f"🗜️ Сжатие переполняющего блока (limit={max_tokens} токенов)...")
+    
+    original_length = len(block_content)
+    
+    # === ШАГ 1: Обработка изображений ===
+    image_pattern = r'\[(?:PAGE_\d+_)?IMAGE_DATA:[^\]]+\]'
+    images = re.findall(image_pattern, block_content)
+    
+    if images:
+        logger.debug(f"Найдено изображений в блоке: {len(images)}")
+        
+        if preserve_images and len(images) <= 3:
+            # Сохраняем до 3 изображений
+            text_without_images = re.sub(image_pattern, '', block_content)
+            compressed_images = images[:3]
+        else:
+            # Удаляем все изображения или оставляем 1 если preserve_images
+            text_without_images = re.sub(image_pattern, '', block_content)
+            compressed_images = images[:1] if preserve_images else []
+        
+        # Добавляем описание удаленных изображений
+        if len(images) > len(compressed_images):
+            removed_count = len(images) - len(compressed_images)
+            text_without_images += f"\n[Удалено изображений для экономии токенов: {removed_count}]"
+    else:
+        text_without_images = block_content
+        compressed_images = []
+    
+    # === ШАГ 2: Сжатие текста если он все еще слишком длинный ===
+    if len(text_without_images) > max_tokens * 4:  # Приблизительно 4 символа = 1 токен
+        logger.debug(f"Сжимаем текст через LLM...")
+        
+        # Сжимаем через LLM
+        compressed_text = _summarize_observation(text_without_images, llm)
+    else:
+        # Текст уже подходит по размеру
+        compressed_text = text_without_images
+    
+    # === ШАГ 3: Собираем результат ===
+    result_parts = [compressed_text]
+    
+    # Добавляем обратно изображения (если сохраняем)
+    if compressed_images:
+        result_parts.extend(compressed_images)
+    
+    result = "\n".join(result_parts)
+    
+    compression_ratio = (1 - len(result) / original_length) * 100 if original_length > 0 else 0
+    logger.info(f"✅ Блок сжат: {original_length} → {len(result)} символов ({compression_ratio:.1f}% сокращение)")
+    
+    return result
+
+
+def _compress_images_in_message(content: str, max_images: int = 2) -> str:
+    """
+    Сжимает количество изображений в сообщении.
+    
+    Args:
+        content: Содержимое сообщения
+        max_images: Максимальное количество изображений
+        
+    Returns:
+        Сообщение с ограниченным количеством изображений
+    """
+    image_pattern = r'\[(?:PAGE_\d+_)?IMAGE_DATA:[^\]]+\]'
+    images = re.findall(image_pattern, content)
+    
+    if len(images) <= max_images:
+        return content
+    
+    # Удаляем все изображения
+    text_without_images = re.sub(image_pattern, '', content)
+    
+    # Добавляем обратно только первые max_images
+    kept_images = images[:max_images]
+    removed_count = len(images) - max_images
+    
+    result = text_without_images
+    if kept_images:
+        result += "\n" + "\n".join(kept_images)
+    
+    result += f"\n[Удалено изображений для экономии контекста: {removed_count}]"
+    
+    logger.debug(f"Сжато изображений: {len(images)} → {max_images}")
+    
+    return result
 
 
 def compress_history_smart(
@@ -58,6 +172,14 @@ def compress_history_smart(
     for i, msg in enumerate(history[1:], 1):
         content = msg.get('content', '')
         
+        # Сжимаем изображения в сообщении если их больше 2
+        image_pattern = r'\[(?:PAGE_\d+_)?IMAGE_DATA:[^\]]+\]'
+        images = re.findall(image_pattern, content)
+        
+        if len(images) > 2:
+            content = _compress_images_in_message(content, max_images=2)
+            logger.debug(f"Сжаты изображения в сообщении #{i}")
+        
         # Проверяем длинные Observation
         if content.startswith('Observation:') and len(content) > 1500:
             logger.debug(f"Сжимаем Observation #{i} (длина: {len(content)})")
@@ -72,8 +194,11 @@ def compress_history_smart(
             observations_compressed += 1
             
         else:
-            # Короткие сообщения оставляем без изменений
-            compressed_history.append(msg)
+            # Короткие сообщения оставляем без изменений (но с уже сжатыми изображениями)
+            compressed_history.append({
+                "role": msg['role'],
+                "content": content
+            })
     
     logger.info(f"🗜️ Сжато длинных Observation: {observations_compressed}")
     
