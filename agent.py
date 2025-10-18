@@ -135,7 +135,8 @@ class Agent:
         
         for name, func in inspect.getmembers(tools, inspect.isfunction):
             # Инструменты для памяти обрабатываются отдельно
-            if func.__module__ == tools.__name__ and name not in ['finish', 'list_memories', 'delete_memory', 'add_memory']:
+            # Пропускаем приватные функции (начинающиеся с _)
+            if func.__module__ == tools.__name__ and name not in ['finish', 'list_memories', 'delete_memory', 'add_memory'] and not name.startswith('_'):
                 self.tools[name] = func
         
         # НОВОЕ: Добавляем MUSE инструменты
@@ -167,7 +168,11 @@ MUSE Memory Tools (для управления памятью обучения):
         
         self.tool_descriptions += "\n" + muse_descriptions
         
-        logger.info(f"Загружены инструменты: {', '.join(list(self.tools.keys()) + ['list_memories', 'delete_memory', 'add_memory'] + list(self.muse_tools.keys()))}")
+        # Подсчитываем все доступные инструменты
+        all_tools_count = len(self.tools) + 3 + len(self.muse_tools)  # +3 для list_memories, delete_memory, add_memory
+        all_tool_names = sorted(list(self.tools.keys()) + ['list_memories', 'delete_memory', 'add_memory'] + list(self.muse_tools.keys()))
+        
+        logger.info(f"Загружено инструментов: {all_tools_count} ({', '.join(all_tool_names[:10])}{'...' if len(all_tool_names) > 10 else ''})")
 
     def _get_system_prompt(self):
         tool_list = self.tool_descriptions
