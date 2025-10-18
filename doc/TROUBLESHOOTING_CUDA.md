@@ -179,13 +179,40 @@ A: Это означает что llama-cpp-python с CUDA установлен 
    # Найдите libcudart.so
    find /usr/local -name "libcudart.so*" 2>/dev/null
    
-   # Добавьте путь в LD_LIBRARY_PATH
+   # Добавьте путь в LD_LIBRARY_PATH (ИСПОЛЬЗУЙТЕ НАЙДЕННЫЙ ПУТЬ!)
+   # Для CUDA 12.x:
    export LD_LIBRARY_PATH=/usr/local/cuda-12.4/lib64:$LD_LIBRARY_PATH
    
+   # Для CUDA 13.x (новая структура):
+   export LD_LIBRARY_PATH=/usr/local/cuda-13.0/targets/x86_64-linux/lib:$LD_LIBRARY_PATH
+   
    # Добавьте в ~/.bashrc для постоянного эффекта
-   echo 'export LD_LIBRARY_PATH=/usr/local/cuda-12.4/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc
+   echo 'export LD_LIBRARY_PATH=/usr/local/cuda-13.0/targets/x86_64-linux/lib:$LD_LIBRARY_PATH' >> ~/.bashrc
    source ~/.bashrc
    ```
+
+### Q: У меня CUDA 13.x, но llama-cpp-python ожидает libcudart.so.12
+A: Несоответствие версий CUDA! У вас CUDA 13.x, но llama-cpp-python собран для CUDA 12.x.
+   
+   **Вариант 1: Создать симлинк (быстрое решение)**
+   ```bash
+   # Найдите путь к libcudart.so.13
+   find /usr/local -name "libcudart.so.13*" 2>/dev/null
+   
+   # Создайте симлинк (пример для CUDA 13.0)
+   sudo ln -s /usr/local/cuda-13.0/targets/x86_64-linux/lib/libcudart.so.13 \
+              /usr/local/cuda-13.0/targets/x86_64-linux/lib/libcudart.so.12
+   
+   # Установите LD_LIBRARY_PATH
+   export LD_LIBRARY_PATH=/usr/local/cuda-13.0/targets/x86_64-linux/lib:$LD_LIBRARY_PATH
+   ```
+   
+   **Вариант 2: Переустановить из исходников (рекомендуется)**
+   ```bash
+   pip uninstall llama-cpp-python -y
+   CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python --force-reinstall --no-cache-dir
+   ```
+   Компиляция из исходников автоматически использует установленную версию CUDA.
 
 ### Q: Почему в v0.0.1-alpha это работало?
 A: Возможно, в v0.0.1-alpha был установлен правильный CUDA-версия llama-cpp-python,

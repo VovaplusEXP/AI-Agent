@@ -17,11 +17,13 @@ def find_cuda_libraries():
     
     # Возможные пути к CUDA
     search_paths = [
+        '/usr/local/cuda*/targets/*/lib',  # Новый формат CUDA 13.x
         '/usr/local/cuda*/lib64',
         '/usr/local/cuda*/lib',
         '/usr/lib/x86_64-linux-gnu',
         '/usr/lib64',
         '/opt/cuda*/lib64',
+        '/opt/cuda*/targets/*/lib',
     ]
     
     found_libs = {}
@@ -35,7 +37,10 @@ def find_cuda_libraries():
                 if cudart_files:
                     version = "unknown"
                     for f in cudart_files:
-                        if 'libcudart.so.12' in f:
+                        if 'libcudart.so.13' in f:
+                            version = "13.x"
+                            break
+                        elif 'libcudart.so.12' in f:
                             version = "12.x"
                             break
                         elif 'libcudart.so.11' in f:
@@ -75,17 +80,41 @@ def generate_fix_commands(cuda_paths):
     
     # Выбираем лучший путь (самую новую версию)
     best_path = None
+    best_version = None
     for path, info in cuda_paths.items():
-        if info['version'] == '12.x':
+        if info['version'] == '13.x':
             best_path = path
+            best_version = '13.x'
             break
+        elif info['version'] == '12.x' and not best_path:
+            best_path = path
+            best_version = '12.x'
     
     if not best_path:
         best_path = list(cuda_paths.keys())[0]
+        best_version = cuda_paths[best_path]['version']
     
     print(f"✅ Найдена CUDA библиотека: {best_path}")
-    print(f"   Версия: {cuda_paths[best_path]['version']}")
+    print(f"   Версия: {best_version}")
     print()
+    
+    # Проверяем на несоответствие версий
+    if best_version == '13.x':
+        print("⚠️  ВАЖНО: У вас CUDA 13.x, но llama-cpp-python может ожидать CUDA 12.x!")
+        print("   Это может вызвать ошибку 'libcudart.so.12: cannot open shared object file'")
+        print()
+        print("📝 Два варианта решения:")
+        print()
+        print("Вариант 1: Создать симлинк для совместимости")
+        print()
+        print(f"   sudo ln -s {best_path}/libcudart.so.13 {best_path}/libcudart.so.12")
+        print(f"   export LD_LIBRARY_PATH={best_path}:$LD_LIBRARY_PATH")
+        print()
+        print("Вариант 2: Переустановить llama-cpp-python из исходников")
+        print()
+        print("   pip uninstall llama-cpp-python -y")
+        print("   CMAKE_ARGS=\"-DGGML_CUDA=on\" pip install llama-cpp-python --force-reinstall --no-cache-dir")
+        print()
     
     # Определяем shell
     shell = os.environ.get('SHELL', '/bin/bash')
