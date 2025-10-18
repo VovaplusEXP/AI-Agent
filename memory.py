@@ -121,10 +121,13 @@ class VectorMemory:
         if not self.model:
             return
         try:
-            # Проверка на дубликаты - не добавляем, если уже есть
-            if text in self.storage:
-                logger.debug(f"Запись уже существует в {self.memory_type} памяти, пропускаем дубликат")
-                return
+            # ИСПРАВЛЕНО: Проверка на дубликаты с учётом метаданных
+            for entry in self.storage:
+                # Извлекаем текст из записи (может быть строкой или dict)
+                entry_text = entry['text'] if isinstance(entry, dict) else entry
+                if entry_text == text:
+                    logger.debug(f"Запись уже существует в {self.memory_type} памяти, пропускаем дубликат")
+                    return
                 
             embedding = self.model.encode([text], convert_to_tensor=False)
             self.index.add(np.array(embedding, dtype=np.float32))

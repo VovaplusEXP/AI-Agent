@@ -71,13 +71,32 @@ class StrategicMemory:
             lesson: The lesson learned (in natural language)
             context: Optional context (tool_name, error_type, etc.)
         """
-        # Check for duplicates
+        # УЛУЧШЕНО: Проверка на дубликаты и похожие записи
+        lesson_lower = lesson.lower().strip()
+        
         for existing in self.lessons:
-            if existing['lesson'] == lesson:
+            existing_lower = existing['lesson'].lower().strip()
+            
+            # Точное совпадение
+            if existing_lower == lesson_lower:
                 existing['usage_count'] = existing.get('usage_count', 1) + 1
                 existing['last_seen'] = datetime.now().isoformat()
                 self.save()
+                logger.debug(f"Урок уже существует, обновлён счётчик использования")
                 return
+            
+            # Проверка на очень похожие уроки (>80% совпадение слов)
+            lesson_words = set(lesson_lower.split())
+            existing_words = set(existing_lower.split())
+            if len(lesson_words) > 3 and len(existing_words) > 3:  # Минимум 4 слова
+                common_words = lesson_words & existing_words
+                similarity = len(common_words) / max(len(lesson_words), len(existing_words))
+                if similarity > 0.8:
+                    existing['usage_count'] = existing.get('usage_count', 1) + 1
+                    existing['last_seen'] = datetime.now().isoformat()
+                    self.save()
+                    logger.debug(f"Найден похожий урок (сходство {similarity:.0%}), обновлён счётчик")
+                    return
         
         entry = {
             'lesson': lesson,
@@ -207,15 +226,43 @@ class ProceduralMemory:
         if not success or len(steps) < 2:
             return  # Only store successful multi-step procedures
         
-        # Check if similar SOP exists
+        # УЛУЧШЕНО: Проверка на похожие SOPs
+        task_lower = task_description.lower().strip()
+        
         for existing in self.sops:
-            if existing['task_description'] == task_description:
+            existing_lower = existing['task_description'].lower().strip()
+            
+            # Точное совпадение описания
+            if existing_lower == task_lower:
                 existing['usage_count'] = existing.get('usage_count', 1) + 1
                 existing['last_used'] = datetime.now().isoformat()
                 if success:
                     existing['success_count'] = existing.get('success_count', 0) + 1
                 self.save()
+                logger.debug(f"SOP уже существует, обновлён счётчик")
                 return
+            
+            # Проверка на очень похожие задачи (>70% совпадение слов)
+            task_words = set(task_lower.split())
+            existing_words = set(existing_lower.split())
+            if len(task_words) > 2 and len(existing_words) > 2:
+                common_words = task_words & existing_words
+                similarity = len(common_words) / max(len(task_words), len(existing_words))
+                
+                # Также проверяем похожесть шагов
+                if similarity > 0.7 and len(steps) == len(existing['steps']):
+                    # Если шаги совпадают на >80%, считаем это дубликатом
+                    matching_steps = sum(1 for s1, s2 in zip(steps, existing['steps']) if s1 == s2)
+                    step_similarity = matching_steps / len(steps)
+                    
+                    if step_similarity > 0.8:
+                        existing['usage_count'] = existing.get('usage_count', 1) + 1
+                        existing['last_used'] = datetime.now().isoformat()
+                        if success:
+                            existing['success_count'] = existing.get('success_count', 0) + 1
+                        self.save()
+                        logger.debug(f"Найдена похожая SOP (сходство задачи {similarity:.0%}, шагов {step_similarity:.0%})")
+                        return
         
         entry = {
             'task_description': task_description,
@@ -358,13 +405,32 @@ class ToolMemory:
         if tool_name not in self.tool_hints:
             self.tool_hints[tool_name] = []
         
-        # Check for duplicate
+        # УЛУЧШЕНО: Проверка на похожие подсказки
+        hint_lower = hint.lower().strip()
+        
         for existing in self.tool_hints[tool_name]:
-            if existing['hint'] == hint:
+            existing_lower = existing['hint'].lower().strip()
+            
+            # Точное совпадение
+            if existing_lower == hint_lower:
                 existing['usage_count'] = existing.get('usage_count', 1) + 1
                 existing['last_seen'] = datetime.now().isoformat()
                 self.save()
+                logger.debug(f"Подсказка для '{tool_name}' уже существует, обновлён счётчик")
                 return
+            
+            # Проверка на очень похожие подсказки (>75% совпадение слов)
+            hint_words = set(hint_lower.split())
+            existing_words = set(existing_lower.split())
+            if len(hint_words) > 3 and len(existing_words) > 3:
+                common_words = hint_words & existing_words
+                similarity = len(common_words) / max(len(hint_words), len(existing_words))
+                if similarity > 0.75:
+                    existing['usage_count'] = existing.get('usage_count', 1) + 1
+                    existing['last_seen'] = datetime.now().isoformat()
+                    self.save()
+                    logger.debug(f"Найдена похожая подсказка для '{tool_name}' (сходство {similarity:.0%})")
+                    return
         
         entry = {
             'hint': hint,
