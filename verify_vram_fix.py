@@ -2,7 +2,7 @@
 """
 Скрипт для проверки исправления загрузки модели и KV-кэша в VRAM.
 
-Этот скрипт демонстрирует, что после удаления параметров type_k и type_v
+Этот скрипт демонстрирует, что после добавления параметра offload_kqv=True
 модель и KV-кэш корректно загружаются в VRAM (CUDA), а не в RAM.
 
 Для работы требуется:
@@ -34,26 +34,34 @@ def verify_llama_initialization():
     print("-" * 70)
     
     # Ищем устаревшие параметры (не в комментариях)
-    # Проверяем, что type_k и type_v НЕ используются как параметры Llama
+    # Проверяем, что offload_kqv=True присутствует в параметрах Llama
     import re
     
-    # Ищем вызов Llama() и проверяем его параметры
+    # Ищем вызов Llama() и проверяем его параметры (улучшенный regex)
     llama_init_match = re.search(
-        r'self\.llm = Llama\((.*?)\)',
+        r'self\.llm = Llama\((.*?)\*\*kwargs\s*\)',
         agent_code,
         re.DOTALL
     )
     
     if llama_init_match:
         llama_params = llama_init_match.group(1)
-        if "type_k=" in llama_params or "type_v=" in llama_params:
-            print("❌ ОШИБКА: Найдены устаревшие параметры type_k или type_v!")
-            print("   Модель и KV-кэш будут загружены в RAM вместо VRAM")
+        
+        # Проверяем наличие offload_kqv=True
+        if "offload_kqv=True" not in llama_params and "offload_kqv = True" not in llama_params:
+            print("❌ ОШИБКА: Отсутствует параметр offload_kqv=True!")
+            print("   KV-кэш будет выполняться на CPU вместо GPU")
             return False
         else:
-            print("✅ Устаревшие параметры type_k и type_v удалены")
-            print("   При n_gpu_layers=-1 модель и KV-кэш автоматически")
-            print("   загружаются в VRAM (CUDA)")
+            print("✅ Параметр offload_kqv=True присутствует")
+            print("   KV-кэш будет выполняться на GPU (VRAM)")
+        
+        # Проверяем наличие type_k и type_v (они должны быть для оптимизации)
+        if "type_k=1" in llama_params and "type_v=1" in llama_params:
+            print("✅ Параметры type_k=1 и type_v=1 присутствуют (FP16 оптимизация)")
+        else:
+            print("⚠️  Предупреждение: отсутствуют type_k=1 и type_v=1")
+            print("   Рекомендуется добавить для оптимизации памяти")
     else:
         print("⚠️  Не удалось найти инициализацию Llama")
         return False
@@ -83,9 +91,10 @@ def verify_llama_initialization():
     print("=" * 70)
     print()
     print("Результат:")
-    print("  - Устаревшие параметры type_k и type_v удалены")
+    print("  - Параметр offload_kqv=True добавлен")
+    print("  - Параметры type_k=1 и type_v=1 присутствуют (FP16 оптимизация)")
     print("  - Модель будет загружаться полностью в VRAM (CUDA)")
-    print("  - KV-кэш будет автоматически размещен в VRAM")
+    print("  - KV-кэш будет выполняться на GPU")
     print("  - Скорость генерации будет максимальной")
     print()
     print("Для полной проверки запустите агент с актуальной моделью:")

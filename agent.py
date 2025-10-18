@@ -19,7 +19,7 @@ from parsers import parse_response_with_fallback  # v3.0.0: новый парс�
 from compression import compress_history_smart  # v3.3.0: интеллектуальное сжатие контекста
 
 # Версия проекта
-__version__ = "0.0.3-p2-alpha"
+__version__ = "0.0.3-p3-alpha"
 
 # Глобальный logger (будет настроен в __init__ с правильными путями)
 logger = logging.getLogger(__name__)
@@ -72,17 +72,20 @@ class Agent:
         flash_attn = os.getenv("LLM_FLASH_ATTN", "true").lower() == "true"
         verbose = os.getenv("LLM_VERBOSE", "false").lower() == "true"
         
-        logger.info(f"Параметры LLM: n_ctx={self.n_ctx}, n_threads={n_threads}, n_gpu_layers={n_gpu_layers}, flash_attn={flash_attn}")
+        logger.info(f"Параметры LLM: n_ctx={self.n_ctx}, n_threads={n_threads}, n_gpu_layers={n_gpu_layers}, flash_attn={flash_attn}, offload_kqv=True")
         
-        # ИСПРАВЛЕНО: Удалены параметры type_k и type_v для автоматического размещения KV-кэша в VRAM
-        # При n_gpu_layers=-1 llama-cpp-python автоматически размещает KV-кэш в VRAM вместе с моделью
-        # Явное указание type_k=1, type_v=1 приводило к размещению KV-кэша в RAM вместо VRAM
+        # ИСПРАВЛЕНО: Добавлен параметр offload_kqv=True для размещения KV-кэша в VRAM
+        # offload_kqv=True обеспечивает выполнение операций KV-кэша на GPU, а не на CPU
+        # type_k=1, type_v=1 определяют формат данных (FP16), а не расположение памяти
         self.llm = Llama(
             model_path=model_path, 
             n_ctx=self.n_ctx,
             n_threads=n_threads,
             n_gpu_layers=n_gpu_layers, 
             flash_attn=flash_attn,
+            offload_kqv=True,   # Выгрузка KV-кэша на GPU (критично для VRAM!)
+            type_k=1,           # FP16 для ключей KV-кэша
+            type_v=1,           # FP16 для значений KV-кэша
             verbose=verbose, 
             chat_format="gemma", 
             **kwargs
