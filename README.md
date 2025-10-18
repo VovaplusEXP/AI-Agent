@@ -1,6 +1,6 @@
 # 🤖 AI Agent - ReAct агент с автономным рассуждением
 
-[![Version](https://img.shields.io/badge/version-0.0.3--alpha-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.0.3--p1--alpha-blue.svg)](CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-alpha-yellow.svg)](ROADMAP.md)
 [![Python](https://img.shields.io/badge/python-3.11+-green.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)

@@ -19,7 +19,7 @@ from parsers import parse_response_with_fallback  # v3.0.0: новый парс�
 from compression import compress_history_smart  # v3.3.0: интеллектуальное сжатие контекста
 
 # Версия проекта
-__version__ = "0.0.3-alpha"
+__version__ = "0.0.3-p1-alpha"
 
 # Глобальный logger (будет настроен в __init__ с правильными путями)
 logger = logging.getLogger(__name__)
@@ -80,6 +80,7 @@ class Agent:
             n_threads=n_threads,
             n_gpu_layers=n_gpu_layers, 
             flash_attn=flash_attn,
+            offload_kqv=True,   # Загрузка KV-кэша в VRAM (исправлено: было в RAM)
             type_k=1,           # FP16 для ключей KV-кэша
             type_v=1,           # FP16 для значений KV-кэша
             verbose=verbose, 

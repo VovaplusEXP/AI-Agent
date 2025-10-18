@@ -1,12 +1,12 @@
 """
-Enhanced CLI for AI Agent with improved UX inspired by google-gemini/gemini-cli
-Features:
-- Real-time context usage display (% free)
-- Memory usage monitoring (RAM)
-- Enhanced Markdown rendering with code highlighting
-- Code preview before file operations
-- Beautiful status bar with gradient effects
-- Improved layout and visual feedback
+Улучшенный CLI для AI Agent с улучшенным UX, вдохновленный google-gemini/gemini-cli
+Возможности:
+- Отображение использования контекста в реальном времени (% свободно)
+- Мониторинг использования памяти (RAM)
+- Улучшенный рендеринг Markdown с подсветкой кода
+- Предварительный просмотр кода перед операциями с файлами
+- Красивая статус-панель с эффектами градиента
+- Улучшенная компоновка и визуальная обратная связь
 """
 import os
 import sys
@@ -77,11 +77,11 @@ class ToolStatsTracker:
         if not self.tool_stats:
             return
         
-        table = Table(title="Tool Statistics", box=box.ROUNDED)
-        table.add_column("Tool", style="cyan")
-        table.add_column("Calls", justify="right")
-        table.add_column("Success Rate", justify="right")
-        table.add_column("Avg Time", justify="right")
+        table = Table(title="Статистика инструментов", box=box.ROUNDED)
+        table.add_column("Инструмент", style="cyan")
+        table.add_column("Вызовы", justify="right")
+        table.add_column("Успешность", justify="right")
+        table.add_column("Среднее время", justify="right")
         
         for tool_name, stats in sorted(self.tool_stats.items()):
             success_rate = (stats['success'] / stats['count'] * 100) if stats['count'] > 0 else 0
@@ -171,26 +171,26 @@ class EnhancedStatusBar:
         
         # Добавляем информацию
         table.add_row(
-            Text("Chat:", style="bold cyan"),
+            Text("Чат:", style="bold cyan"),
             Text(self.agent.current_chat, style="bold blue"),
             ""
         )
         
         table.add_row(
-            Text("Context:", style="bold cyan"),
-            Text(f"{free_percent:.0f}% free", style=f"bold {context_color}"),
-            Text(f"({current_tokens:,}/{max_tokens:,} tokens)", style="dim")
+            Text("Контекст:", style="bold cyan"),
+            Text(f"{free_percent:.0f}% свободно", style=f"bold {context_color}"),
+            Text(f"({current_tokens:,}/{max_tokens:,} токенов)", style="dim")
         )
         
         table.add_row(
-            Text("Memory:", style="bold cyan"),
+            Text("Память:", style="bold cyan"),
             Text(mem_str, style=f"bold {mem_color}"),
             ""
         )
         
         return Panel(
             table,
-            title="[bold cyan]Status[/bold cyan]",
+            title="[bold cyan]Статус[/bold cyan]",
             border_style="cyan",
             box=box.ROUNDED
         )
@@ -216,12 +216,12 @@ class CodePreviewDialog:
             True если пользователь подтвердил, False иначе
         """
         self.console.print()
-        self.console.rule("[bold cyan]Code Preview[/bold cyan]")
+        self.console.rule("[bold cyan]Предпросмотр кода[/bold cyan]")
         self.console.print()
         
         # Показываем путь к файлу
-        self.console.print(f"[bold]File:[/bold] [cyan]{file_path}[/cyan]")
-        self.console.print(f"[bold]Lines:[/bold] {len(content.splitlines())}")
+        self.console.print(f"[bold]Файл:[/bold] [cyan]{file_path}[/cyan]")
+        self.console.print(f"[bold]Строк:[/bold] {len(content.splitlines())}")
         self.console.print()
         
         # Показываем код с подсветкой синтаксиса
@@ -238,14 +238,14 @@ class CodePreviewDialog:
         # Запрашиваем подтверждение
         try:
             response = self.session.prompt(
-                "Write this file? ([Y]es/[N]o/[E]dit path) ",
+                "Записать этот файл? ([Д]а/[Н]ет/[И]зменить путь) ",
                 default="y"
             ).lower()
             
             if response in ['y', 'yes', 'д', 'да']:
                 return True
-            elif response in ['e', 'edit', 'р', 'редактировать']:
-                new_path = self.session.prompt("Enter new file path: ", default=file_path)
+            elif response in ['e', 'edit', 'и', 'изменить']:
+                new_path = self.session.prompt("Введите новый путь к файлу: ", default=file_path)
                 return new_path  # Возвращаем новый путь
             else:
                 return False
@@ -327,14 +327,14 @@ class EnhancedCLI:
         hints.add_column(style="cyan", justify="right")
         hints.add_column(style="white")
         
-        hints.add_row("📝 Commands:", "/help - show all commands")
-        hints.add_row("🔄 Switch mode:", "Ctrl+O - toggle chat/shell mode")
-        hints.add_row("📊 Statistics:", "/memory - show memory stats")
-        hints.add_row("🚪 Exit:", "exit or quit")
+        hints.add_row("📝 Команды:", "/help - показать все команды")
+        hints.add_row("🔄 Переключение:", "Ctrl+O - переключить режим чат/оболочка")
+        hints.add_row("📊 Статистика:", "/memory - показать статистику памяти")
+        hints.add_row("🚪 Выход:", "exit или quit")
         
         self.console.print(Panel(
             hints,
-            title="[bold cyan]Quick Start[/bold cyan]",
+            title="[bold cyan]Быстрый старт[/bold cyan]",
             border_style="cyan",
             box=box.ROUNDED
         ))
@@ -343,40 +343,40 @@ class EnhancedCLI:
     def show_help(self):
         """Выводит красивую справку по командам"""
         help_content = Table(show_header=True, header_style="bold cyan", box=box.ROUNDED)
-        help_content.add_column("Command", style="cyan", width=25)
-        help_content.add_column("Description", style="white")
+        help_content.add_column("Команда", style="cyan", width=25)
+        help_content.add_column("Описание", style="white")
         
         # Команды управления чатами
         help_content.add_row("", "")
-        help_content.add_row("[bold]Chat Management[/bold]", "")
-        help_content.add_row("/new <name> [desc]", "Create new chat")
-        help_content.add_row("/switch <name>", "Switch to chat")
-        help_content.add_row("/list", "Show active chats")
+        help_content.add_row("[bold]Управление чатами[/bold]", "")
+        help_content.add_row("/new <имя> [описание]", "Создать новый чат")
+        help_content.add_row("/switch <имя>", "Переключиться на чат")
+        help_content.add_row("/list", "Показать активные чаты")
         
         # Команды сохранения
         help_content.add_row("", "")
-        help_content.add_row("[bold]Save/Load[/bold]", "")
-        help_content.add_row("/save [desc]", "Save current chat")
-        help_content.add_row("/load <name>", "Load chat from disk")
-        help_content.add_row("/saved", "Show saved chats")
-        help_content.add_row("/delete <name>", "Delete saved chat")
+        help_content.add_row("[bold]Сохранение/Загрузка[/bold]", "")
+        help_content.add_row("/save [описание]", "Сохранить текущий чат")
+        help_content.add_row("/load <имя>", "Загрузить чат с диска")
+        help_content.add_row("/saved", "Показать сохраненные чаты")
+        help_content.add_row("/delete <имя>", "Удалить сохраненный чат")
         
         # Команды памяти и статистики
         help_content.add_row("", "")
-        help_content.add_row("[bold]Memory & Stats[/bold]", "")
-        help_content.add_row("/memory", "Show memory statistics")
-        help_content.add_row("/status", "Show detailed status")
-        help_content.add_row("/stats", "Show session & tool statistics")
+        help_content.add_row("[bold]Память и статистика[/bold]", "")
+        help_content.add_row("/memory", "Показать статистику памяти")
+        help_content.add_row("/status", "Показать детальный статус")
+        help_content.add_row("/stats", "Показать статистику сессии и инструментов")
         
         # Прочее
         help_content.add_row("", "")
-        help_content.add_row("[bold]Other[/bold]", "")
-        help_content.add_row("Ctrl+O", "Toggle chat/shell mode")
-        help_content.add_row("exit, quit", "Exit program")
+        help_content.add_row("[bold]Прочее[/bold]", "")
+        help_content.add_row("Ctrl+O", "Переключить режим чат/оболочка")
+        help_content.add_row("exit, quit", "Выйти из программы")
         
         self.console.print(Panel(
             help_content,
-            title="[bold cyan]Available Commands[/bold cyan]",
+            title="[bold cyan]Доступные команды[/bold cyan]",
             border_style="cyan",
             box=box.ROUNDED
         ))
@@ -406,19 +406,19 @@ class EnhancedCLI:
         else:
             duration_str = f"{seconds}s"
         
-        stats_table.add_row("Session Duration:", duration_str)
-        stats_table.add_row("Current Chat:", self.agent.current_chat)
+        stats_table.add_row("Длительность сессии:", duration_str)
+        stats_table.add_row("Текущий чат:", self.agent.current_chat)
         
         # Получаем данные о контексте и памяти
         current_tokens, max_tokens, free_percent = self.status_bar.get_context_usage()
         mem_mb, mem_str = self.status_bar.get_memory_usage()
         
-        stats_table.add_row("Context Usage:", f"{current_tokens:,}/{max_tokens:,} tokens ({free_percent:.0f}% free)")
-        stats_table.add_row("Memory Usage:", mem_str)
+        stats_table.add_row("Использование контекста:", f"{current_tokens:,}/{max_tokens:,} токенов ({free_percent:.0f}% свободно)")
+        stats_table.add_row("Использование памяти:", mem_str)
         
         self.console.print(Panel(
             stats_table,
-            title="[bold cyan]Session Statistics[/bold cyan]",
+            title="[bold cyan]Статистика сессии[/bold cyan]",
             border_style="cyan",
             box=box.ROUNDED
         ))
@@ -476,20 +476,20 @@ class EnhancedCLI:
             self.show_help()
             
         else:
-            self.console.print("[red]Unknown command. Type /help for available commands.[/red]")
+            self.console.print("[red]Неизвестная команда. Введите /help для списка доступных команд.[/red]")
 
     def handle_shell_command(self, command: str):
         """Выполняет команду оболочки"""
         if command.lower() == 'exit':
             self.in_shell_mode = False
-            self.console.print("[bold blue]Returning to chat mode.[/bold blue]")
+            self.console.print("[bold blue]Возврат в режим чата.[/bold blue]")
             return
 
         try:
             if command.strip().startswith('cd '):
                 path = command.strip().split(' ', 1)[1]
                 os.chdir(path)
-                output_msg = f"Changed directory: {os.getcwd()}"
+                output_msg = f"Изменена директория: {os.getcwd()}"
                 self.console.print(f"[cyan]{output_msg}[/cyan]")
                 
                 shell_context = f"[Shell Command] $ {command}\n{output_msg}"
@@ -510,7 +510,7 @@ class EnhancedCLI:
                 
                 shell_context = f"[Shell Command] $ {command}\n{output[:500]}"
                 if len(output) > 500:
-                    shell_context += "\n... (output truncated)"
+                    shell_context += "\n... (вывод обрезан)"
                 
                 self.agent.histories[self.agent.current_chat].append({
                     "role": "user", 
@@ -518,14 +518,14 @@ class EnhancedCLI:
                 })
                 
         except FileNotFoundError:
-            error_msg = f"Error: Directory not found '{path}'"
+            error_msg = f"Ошибка: Директория не найдена '{path}'"
             self.console.print(f"[red]{error_msg}[/red]")
             self.agent.histories[self.agent.current_chat].append({
                 "role": "user",
                 "content": f"Observation (Shell): [Error] {error_msg}"
             })
         except Exception as e:
-            error_msg = f"Error executing command: {e}"
+            error_msg = f"Ошибка выполнения команды: {e}"
             self.console.print(f"[bold red]{error_msg}[/bold red]")
             self.agent.histories[self.agent.current_chat].append({
                 "role": "user",
@@ -558,14 +558,14 @@ class EnhancedCLI:
                     ('class:prompt.bracket', '['),
                     ('class:prompt.chat_name', self.agent.current_chat),
                     ('class:prompt.bracket', ']'),
-                    ('', ' You: '),
+                    ('', ' Вы: '),
                 ]
                 user_input = self.session.prompt(prompt_parts)
                 if user_input is None:
                     continue
 
                 if user_input.lower() in ["exit", "quit", "выход"]:
-                    self.console.print("[bold yellow]Exiting...[/bold yellow]")
+                    self.console.print("[bold yellow]Выход...[/bold yellow]")
                     break
 
                 if user_input.startswith('/'):
@@ -577,7 +577,7 @@ class EnhancedCLI:
                 
                 try:
                     # Показываем spinner во время ожидания первого ответа
-                    with self.console.status("[cyan]Agent thinking...[/cyan]", spinner="dots") as status:
+                    with self.console.status("[cyan]Агент думает...[/cyan]", spinner="dots") as status:
                         agent_step = next(agent_generator)
 
                     while True:
@@ -589,7 +589,7 @@ class EnhancedCLI:
                         # Красивое отображение мысли агента
                         self.console.print(Panel(
                             f"[yellow]{thought}[/yellow]",
-                            title="[bold cyan]💭 Agent Thinking[/bold cyan]",
+                            title="[bold cyan]💭 Мысль агента[/bold cyan]",
                             border_style="cyan",
                             box=box.ROUNDED
                         ))
@@ -600,13 +600,13 @@ class EnhancedCLI:
                             params_str = ', '.join([f'{k}={v!r}' for k, v in parameters.items()])
                             action_str += f"({params_str})"
                         
-                        self.console.print(f"[bold magenta]🔧 Action:[/bold magenta] {action_str}")
+                        self.console.print(f"[bold magenta]🔧 Действие:[/bold magenta] {action_str}")
 
                         if tool_name == "finish":
-                            final_answer = parameters.get("final_answer", "Task completed.")
+                            final_answer = parameters.get("final_answer", "Задача выполнена.")
                             self.console.print(Panel(
                                 Markdown(final_answer),
-                                title="[bold green]✓ Final Answer[/bold green]",
+                                title="[bold green]✓ Финальный ответ[/bold green]",
                                 border_style="green",
                                 box=box.ROUNDED
                             ))
@@ -631,22 +631,22 @@ class EnhancedCLI:
                                 should_proceed = True
                             else:
                                 should_proceed = False
-                                self.console.print("[red]✗ File write cancelled[/red]")
+                                self.console.print("[red]✗ Запись файла отменена[/red]")
                         else:
                             should_proceed = False
                             user_choice = ''
 
                             if auto_approve:
-                                self.console.print("[dim]Executing (auto-approved)...[/dim]")
+                                self.console.print("[dim]Выполняется (автоматически одобрено)...[/dim]")
                                 should_proceed = True
                             else:
                                 user_choice = self.session.prompt(
-                                    "Execute this action? ([Y]es/[N]o/[A]lways) ",
+                                    "Выполнить это действие? ([Д]а/[Н]ет/[В]сегда) ",
                                     default="y"
                                 ).lower()
-                                if user_choice in ['y', 'yes', 'д']:
+                                if user_choice in ['y', 'yes', 'д', 'да']:
                                     should_proceed = True
-                                elif user_choice in ['a', 'always', 'всегда']:
+                                elif user_choice in ['a', 'always', 'в', 'всегда']:
                                     auto_approve = True
                                     should_proceed = True
 
@@ -656,17 +656,17 @@ class EnhancedCLI:
                             self.tool_tracker.start_tool(tool_name)
                             
                             # Показываем spinner во время выполнения
-                            with self.console.status(f"[cyan]Executing {tool_name}...[/cyan]", spinner="dots"):
+                            with self.console.status(f"[cyan]Выполнение {tool_name}...[/cyan]", spinner="dots"):
                                 agent_step = agent_generator.send(True)
                             
                             # Записываем результат (предполагаем успех, если нет исключения)
                             self.tool_tracker.end_tool(tool_name, True)
                         else:
                             agent_step = agent_generator.send(False)
-                            self.console.print("[red]✗ Action cancelled[/red]")
+                            self.console.print("[red]✗ Действие отменено[/red]")
                 
                 except StopIteration:
-                    self.console.print("[yellow]Agent completed or reached iteration limit.[/yellow]")
+                    self.console.print("[yellow]Агент завершил работу или достиг лимита итераций.[/yellow]")
                 
                 # Обновляем статистику контекста после цикла
                 if hasattr(self.agent.context_manager, 'last_build_stats'):
@@ -675,19 +675,19 @@ class EnhancedCLI:
                 self.console.rule(style="dim")
 
         except KeyboardInterrupt:
-            self.console.print("\n\n[bold yellow]Interrupted. Exiting...[/bold yellow]")
+            self.console.print("\n\n[bold yellow]Прервано. Выход...[/bold yellow]")
         except Exception as e:
-            logging.critical("Critical error in main CLI loop.", exc_info=True)
-            self.console.print(f"\n[bold red]Critical error (see agent.log):[/bold red] {e}")
+            logging.critical("Критическая ошибка в основном цикле CLI.", exc_info=True)
+            self.console.print(f"\n[bold red]Критическая ошибка (см. agent.log):[/bold red] {e}")
         finally:
             # Сохранение памяти при выходе
             try:
-                self.console.print("\n[bold blue]Saving agent memory...[/bold blue]")
+                self.console.print("\n[bold blue]Сохранение памяти агента...[/bold blue]")
                 self.agent.memory_manager.save_all()
-                self.console.print("[bold green]Memory saved successfully.[/bold green]")
+                self.console.print("[bold green]Память успешно сохранена.[/bold green]")
             except Exception as e:
-                self.console.print(f"[bold red]Error saving memory: {e}[/bold red]")
-                logging.error(f"Error saving memory: {e}", exc_info=True)
+                self.console.print(f"[bold red]Ошибка сохранения памяти: {e}[/bold red]")
+                logging.error(f"Ошибка сохранения памяти: {e}", exc_info=True)
 
 
 def main():
@@ -696,8 +696,8 @@ def main():
         cli = EnhancedCLI(model_path=MODEL_PATH, chats_dir=CHATS_DIR)
         cli.run()
     except Exception as e:
-        logging.critical("Error initializing agent.", exc_info=True)
-        print(f"Error initializing agent (see agent.log): {e}")
+        logging.critical("Ошибка инициализации агента.", exc_info=True)
+        print(f"Ошибка инициализации агента (см. agent.log): {e}")
 
 
 if __name__ == "__main__":
