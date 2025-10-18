@@ -13,10 +13,60 @@ import sys
 import os
 from pathlib import Path
 
+def check_cuda_runtime_libraries():
+    """Проверка доступности CUDA runtime библиотек"""
+    print("=" * 70)
+    print("1. ПРОВЕРКА CUDA RUNTIME БИБЛИОТЕК")
+    print("=" * 70)
+    
+    import subprocess
+    import glob
+    
+    # Ищем libcudart.so в системе
+    possible_paths = [
+        '/usr/local/cuda/lib64',
+        '/usr/local/cuda-12/lib64',
+        '/usr/local/cuda-12.*/lib64',
+        '/usr/lib/x86_64-linux-gnu',
+        '/usr/lib64',
+    ]
+    
+    found_cudart = []
+    for pattern in possible_paths:
+        matches = glob.glob(pattern)
+        for path in matches:
+            if os.path.isdir(path):
+                cudart_files = glob.glob(os.path.join(path, 'libcudart.so*'))
+                if cudart_files:
+                    found_cudart.extend(cudart_files)
+    
+    if found_cudart:
+        print(f"✅ Найдены CUDA runtime библиотеки:")
+        for lib in found_cudart[:3]:  # Показываем первые 3
+            print(f"   {lib}")
+        
+        # Проверяем, доступны ли они через ldconfig
+        try:
+            result = subprocess.run(['ldconfig', '-p'], 
+                                  capture_output=True, text=True, timeout=5)
+            if 'libcudart.so' in result.stdout:
+                print("✅ libcudart.so доступна через ldconfig")
+            else:
+                print("⚠️  libcudart.so НЕ доступна через ldconfig")
+                print("   Нужно добавить путь к CUDA библиотекам в LD_LIBRARY_PATH")
+        except Exception as e:
+            print(f"⚠️  Не удалось проверить ldconfig: {e}")
+    else:
+        print("❌ CUDA runtime библиотеки НЕ найдены")
+        print("   Установите CUDA Toolkit")
+    
+    print()
+    return len(found_cudart) > 0
+
 def check_cuda_environment():
     """Проверка переменных окружения CUDA"""
     print("=" * 70)
-    print("1. ПРОВЕРКА ПЕРЕМЕННЫХ ОКРУЖЕНИЯ CUDA")
+    print("2. ПРОВЕРКА ПЕРЕМЕННЫХ ОКРУЖЕНИЯ CUDA")
     print("=" * 70)
     
     cuda_home = os.environ.get('CUDA_HOME') or os.environ.get('CUDA_PATH')
@@ -28,17 +78,18 @@ def check_cuda_environment():
     
     ld_library_path = os.environ.get('LD_LIBRARY_PATH', '')
     if 'cuda' in ld_library_path.lower():
-        print(f"✅ LD_LIBRARY_PATH содержит CUDA")
+        print(f"✅ LD_LIBRARY_PATH содержит CUDA: {ld_library_path}")
     else:
-        print("⚠️  LD_LIBRARY_PATH не содержит CUDA")
-        print("   Установите: export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH")
+        print("❌ LD_LIBRARY_PATH не содержит CUDA")
+        print("   Установите: export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH")
+        print("   Или для CUDA 12.x: export LD_LIBRARY_PATH=/usr/local/cuda-12/lib64:$LD_LIBRARY_PATH")
     
     print()
 
 def check_cuda_toolkit():
     """Проверка установки CUDA Toolkit"""
     print("=" * 70)
-    print("2. ПРОВЕРКА CUDA TOOLKIT")
+    print("3. ПРОВЕРКА CUDA TOOLKIT")
     print("=" * 70)
     
     import subprocess
@@ -81,7 +132,7 @@ def check_cuda_toolkit():
 def check_pytorch_cuda():
     """Проверка CUDA поддержки в PyTorch"""
     print("=" * 70)
-    print("3. ПРОВЕРКА PYTORCH CUDA")
+    print("4. ПРОВЕРКА PYTORCH CUDA")
     print("=" * 70)
     
     try:
@@ -107,7 +158,7 @@ def check_pytorch_cuda():
 def check_llama_cpp_cuda():
     """Проверка CUDA поддержки в llama-cpp-python"""
     print("=" * 70)
-    print("4. ПРОВЕРКА LLAMA-CPP-PYTHON CUDA")
+    print("5. ПРОВЕРКА LLAMA-CPP-PYTHON CUDA")
     print("=" * 70)
     
     try:
@@ -191,10 +242,10 @@ def check_llama_cpp_cuda():
     
     print()
 
-def print_recommendations():
+def print_recommendations(has_cudart_libs=False):
     """Вывод рекомендаций"""
     print("=" * 70)
-    print("5. РЕКОМЕНДАЦИИ")
+    print("6. РЕКОМЕНДАЦИИ")
     print("=" * 70)
     
     print("""
@@ -206,28 +257,58 @@ def print_recommendations():
 2. Убедитесь что CUDA Toolkit установлен:
    nvcc --version
 
-3. Установите переменные окружения (добавьте в ~/.bashrc):
+3. ⚠️  ВАЖНО: Установите переменные окружения (добавьте в ~/.bashrc или ~/.zshrc):
+   
+   # Для CUDA 12.x
+   export CUDA_HOME=/usr/local/cuda-12
+   export PATH=$CUDA_HOME/bin:$PATH
+   export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+   
+   # Или если CUDA установлена в /usr/local/cuda
    export CUDA_HOME=/usr/local/cuda
    export PATH=$CUDA_HOME/bin:$PATH
    export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+   
+   # После изменения ~/.bashrc:
+   source ~/.bashrc
+   
+   # Или для ~/.zshrc:
+   source ~/.zshrc
 
-4. Переустановите PyTorch с CUDA (если нужно):
+4. 🔥 КРИТИЧНО при ошибке "libcudart.so.12: cannot open shared object file":
+   
+   Найдите где находится libcudart.so:
+   find /usr/local -name "libcudart.so*" 2>/dev/null
+   find /usr/lib -name "libcudart.so*" 2>/dev/null
+   
+   Затем добавьте найденный путь в LD_LIBRARY_PATH:
+   export LD_LIBRARY_PATH=/путь/к/cuda/lib64:$LD_LIBRARY_PATH
+   
+   Например:
+   export LD_LIBRARY_PATH=/usr/local/cuda-12.4/lib64:$LD_LIBRARY_PATH
+
+5. Переустановите PyTorch с CUDA (если нужно):
    pip install torch --index-url https://download.pytorch.org/whl/cu121
 
-5. Переустановите llama-cpp-python с CUDA:
+6. Переустановите llama-cpp-python с CUDA:
    
    Вариант A (предсобранные wheels, быстрее):
    pip uninstall llama-cpp-python -y
+   
+   # Для CUDA 12.4 (как у вас):
+   pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124
+   
+   # Для CUDA 12.1:
    pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
    
    Вариант B (компиляция, лучшая производительность):
    pip uninstall llama-cpp-python -y
    CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python --force-reinstall --no-cache-dir
 
-6. Перезапустите terminal и проверьте снова:
+7. Перезапустите terminal и проверьте снова:
    python3 diagnose_cuda.py
 
-7. Запустите агент:
+8. Запустите агент:
    python cli.py
 """)
 
@@ -238,13 +319,14 @@ def main():
     print("╚══════════════════════════════════════════════════════════════════════╝")
     print()
     
+    has_cudart = check_cuda_runtime_libraries()
     check_cuda_environment()
     check_cuda_toolkit()
     check_pytorch_cuda()
     has_cuda = check_llama_cpp_cuda()
     
-    if not has_cuda:
-        print_recommendations()
+    if not has_cuda or not has_cudart:
+        print_recommendations(has_cudart)
         return 1
     else:
         print("=" * 70)

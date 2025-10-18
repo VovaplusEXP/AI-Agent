@@ -1,6 +1,6 @@
 # 🤖 AI Agent - ReAct агент с автономным рассуждением
 
-[![Version](https://img.shields.io/badge/version-0.0.3--p4--alpha-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.0.3--p5--alpha-blue.svg)](CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-alpha-yellow.svg)](ROADMAP.md)
 [![Python](https://img.shields.io/badge/python-3.11+-green.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
@@ -147,6 +147,9 @@ pip install -r requirements.txt
 ```bash
 # Диагностика CUDA и llama-cpp-python
 python3 diagnose_cuda.py
+
+# Если ошибка "libcudart.so.12: cannot open shared object file"
+python3 fix_libcudart.py
 ```
 
 > **Примечание:** Без CUDA поддержки модель будет работать на CPU, что очень медленно. См. `requirements-cuda.txt` для деталей.
@@ -311,6 +314,6 @@ if __name__ == "__main__":
 
 [Документация](doc/DOCUMENTATION.md) • [Changelog](CHANGELOG.md) • [Roadmap](ROADMAP.md)
 
-**v0.0.3-p4-alpha** | 2025-10-18
+**v0.0.3-p5-alpha** | 2025-10-18
 
 </div>
