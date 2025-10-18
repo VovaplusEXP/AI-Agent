@@ -74,14 +74,15 @@ class Agent:
         
         logger.info(f"Параметры LLM: n_ctx={self.n_ctx}, n_threads={n_threads}, n_gpu_layers={n_gpu_layers}, flash_attn={flash_attn}")
         
+        # ИСПРАВЛЕНО: Удалены параметры type_k и type_v для автоматического размещения KV-кэша в VRAM
+        # При n_gpu_layers=-1 llama-cpp-python автоматически размещает KV-кэш в VRAM вместе с моделью
+        # Явное указание type_k=1, type_v=1 приводило к размещению KV-кэша в RAM вместо VRAM
         self.llm = Llama(
             model_path=model_path, 
             n_ctx=self.n_ctx,
             n_threads=n_threads,
             n_gpu_layers=n_gpu_layers, 
             flash_attn=flash_attn,
-            type_k=1,           # FP16 для ключей KV-кэша
-            type_v=1,           # FP16 для значений KV-кэша
             verbose=verbose, 
             chat_format="gemma", 
             **kwargs
