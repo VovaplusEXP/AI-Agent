@@ -101,7 +101,7 @@ cp .env.example .env
 
 ```bash
 source venv/bin/activate
-python cli.py
+python enhanced_cli.py
 ```
 
 ### Первые шаги

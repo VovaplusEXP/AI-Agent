@@ -128,7 +128,7 @@ pip install -r requirements.txt
 ### 2. Запуск
 
 ```bash
-python cli.py
+python enhanced_cli.py
 ```
 
 ### 3. Примеры задач

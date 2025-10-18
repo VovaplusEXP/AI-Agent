@@ -236,7 +236,7 @@ if tool_name == "internet_search" and parameters.get("query"):
 
 **Команда:**
 ```bash
-python cli.py --question "Найди информацию о Python 3.13 и сохрани в файл"
+python enhanced_cli.py --question "Найди информацию о Python 3.13 и сохрани в файл"
 ```
 
 **Ожидаемое поведение:**
@@ -333,7 +333,7 @@ internet_search → web_fetch → web_search_in_page → create_file → finish
 
 1. **Тестирование** (сейчас):
    ```bash
-   python cli.py --question "Найди информацию о Python 3.13"
+   python enhanced_cli.py --question "Найди информацию о Python 3.13"
    ```
 
 2. **Анализ логов**:
