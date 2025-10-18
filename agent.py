@@ -19,7 +19,7 @@ from parsers import parse_response_with_fallback  # v3.0.0: новый парс�
 from compression import compress_history_smart  # v3.3.0: интеллектуальное сжатие контекста
 
 # Версия проекта
-__version__ = "0.0.3-p1-alpha"
+__version__ = "0.0.3-p2-alpha"
 
 # Глобальный logger (будет настроен в __init__ с правильными путями)
 logger = logging.getLogger(__name__)
