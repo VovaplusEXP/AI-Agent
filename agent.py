@@ -138,19 +138,51 @@ class Agent:
             if func.__module__ == tools.__name__ and name not in ['finish', 'list_memories', 'delete_memory', 'add_memory']:
                 self.tools[name] = func
         
+        # НОВОЕ: Добавляем MUSE инструменты
+        import muse_tools
+        self.muse_tools = {
+            'view_strategic_lessons': lambda: muse_tools.view_strategic_lessons(self.muse_memory),
+            'view_procedural_sops': lambda: muse_tools.view_procedural_sops(self.muse_memory),
+            'view_tool_hints': lambda tool_name=None: muse_tools.view_tool_hints(self.muse_memory, tool_name),
+            'add_strategic_lesson': lambda lesson, tool_name=None: muse_tools.add_strategic_lesson(self.muse_memory, lesson, tool_name),
+            'add_tool_hint': lambda tool_name, hint: muse_tools.add_tool_hint(self.muse_memory, tool_name, hint),
+            'compress_muse_memory': lambda: muse_tools.compress_muse_memory(self.muse_memory, self.llm)
+        }
+        
         self.tool_descriptions = "\n".join([
             f"- {name}{inspect.signature(func)}: {inspect.getdoc(func)}" 
             for name, func in inspect.getmembers(tools, inspect.isfunction) 
             if func.__module__ == tools.__name__
         ])
-        logger.info(f"Загружены инструменты: {', '.join(list(self.tools.keys()) + ['list_memories', 'delete_memory', 'add_memory'])}")
+        
+        # НОВОЕ: Добавляем описания MUSE инструментов
+        muse_descriptions = """
+MUSE Memory Tools (для управления памятью обучения):
+- view_strategic_lessons(): Просмотр стратегических уроков из опыта
+- view_procedural_sops(): Просмотр процедур (SOPs) для типовых задач
+- view_tool_hints(tool_name=None): Просмотр подсказок по использованию инструментов
+- add_strategic_lesson(lesson, tool_name=None): Добавить стратегический урок вручную
+- add_tool_hint(tool_name, hint): Добавить подсказку для инструмента
+- compress_muse_memory(): Сжать MUSE память (удалить низкокачественные записи)"""
+        
+        self.tool_descriptions += "\n" + muse_descriptions
+        
+        logger.info(f"Загружены инструменты: {', '.join(list(self.tools.keys()) + ['list_memories', 'delete_memory', 'add_memory'] + list(self.muse_tools.keys()))}")
 
     def _get_system_prompt(self):
         tool_list = self.tool_descriptions
         current_date = datetime.now().strftime('%d.%m.%Y')
         return f"""Дата: {current_date}
 
-Ты — ReAct-агент (Thought → Action → Observation цикл).
+Ты — ReAct-агент (Thought → Action → Observation цикл) с MUSE памятью обучения.
+
+🧠 ПАМЯТЬ MUSE:
+У тебя есть доступ к трём типам памяти обучения:
+1. СТРАТЕГИЧЕСКИЕ УРОКИ - извлеченные из предыдущих ошибок
+2. ПРОЦЕДУРЫ (SOPs) - проверенные последовательности шагов для типовых задач
+3. ПОДСКАЗКИ ПО ИНСТРУМЕНТАМ - паттерны эффективного использования
+
+⚠️ ВАЖНО: Если в контексте есть релевантные УРОКИ или ПРОЦЕДУРЫ - ОБЯЗАТЕЛЬНО следуй им!
 
 ФОРМАТ ОТВЕТА — СТРОГО ОБЯЗАТЕЛЬНЫЙ:
 <THOUGHT>твои рассуждения<TOOL>имя_инструмента<PARAMS>{{"param": "value"}}<END>
@@ -592,6 +624,17 @@ no
                     project_memory = self.memory_manager.get_project_memory(self.current_chat)
                     project_memory.add(parameters['text'])
                     result = f"Запись успешно добавлена в проектную память '{self.current_chat}'."
+                
+                # НОВОЕ: Обработка MUSE инструментов
+                elif tool_name in self.muse_tools:
+                    logger.info(f"Выполнение MUSE инструмента: {tool_name}")
+                    try:
+                        result = self.muse_tools[tool_name](**parameters)
+                        tool_success = True
+                    except Exception as e:
+                        logger.error(f"Ошибка в MUSE инструменте '{tool_name}': {e}")
+                        result = f"Ошибка: {e}"
+                        tool_success = False
 
                 elif tool_name == "finish":
                     logger.info("Агент завершил работу.")
