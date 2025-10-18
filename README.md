@@ -1,6 +1,6 @@
 # 🤖 AI Agent - ReAct агент с автономным рассуждением
 
-[![Version](https://img.shields.io/badge/version-0.0.3--p3--alpha-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.0.3--p4--alpha-blue.svg)](CHANGELOG.md)
 [![Status](https://img.shields.io/badge/status-alpha-yellow.svg)](ROADMAP.md)
 [![Python](https://img.shields.io/badge/python-3.11+-green.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
@@ -116,9 +116,40 @@
 
 ### 1. Установка зависимостей
 
+#### Для CPU (без GPU):
 ```bash
 pip install -r requirements.txt
 ```
+
+#### Для GPU (с CUDA поддержкой):
+
+**⚠️ ВАЖНО:** Если у вас NVIDIA GPU, установите llama-cpp-python с CUDA поддержкой для максимальной производительности!
+
+**Вариант 1 (рекомендуется): Предсобранные CUDA wheels**
+```bash
+# Для CUDA 12.1
+pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
+
+# Для CUDA 11.8
+pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu118
+
+# Затем установите остальные зависимости
+pip install -r requirements.txt
+```
+
+**Вариант 2: Компиляция из исходников (лучшая производительность)**
+```bash
+CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python --force-reinstall --no-cache-dir
+pip install -r requirements.txt
+```
+
+**Проверка CUDA:**
+```bash
+# Диагностика CUDA и llama-cpp-python
+python3 diagnose_cuda.py
+```
+
+> **Примечание:** Без CUDA поддержки модель будет работать на CPU, что очень медленно. См. `requirements-cuda.txt` для деталей.
 
 ### 2. Запуск агента
 
@@ -280,6 +311,6 @@ if __name__ == "__main__":
 
 [Документация](doc/DOCUMENTATION.md) • [Changelog](CHANGELOG.md) • [Roadmap](ROADMAP.md)
 
-**v0.0.3-p3-alpha** | 2025-10-18
+**v0.0.3-p4-alpha** | 2025-10-18
 
 </div>

@@ -1,6 +1,10 @@
 # AI Agent - Зависимости проекта
 
 # LLM и векторная память
+# ВАЖНО: Для CUDA поддержки используйте одну из команд:
+# pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
+# или для компиляции из исходников:
+# CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python --force-reinstall --no-cache-dir
 llama-cpp-python>=0.3.0
 faiss-cpu>=1.8.0
 sentence-transformers>=2.2.0

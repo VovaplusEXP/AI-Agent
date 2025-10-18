@@ -1,0 +1,57 @@
+# AI Agent - Зависимости с CUDA поддержкой
+
+# ЭТОТ ФАЙЛ УСТАНАВЛИВАЕТ CUDA-версию llama-cpp-python
+# Используйте этот файл если у вас есть NVIDIA GPU с CUDA
+
+# ============================================
+# УСТАНОВКА:
+# ============================================
+# Вариант 1: Использовать предсобранные CUDA wheels
+# pip install -r requirements-cuda.txt --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
+
+# Вариант 2: Компиляция из исходников (рекомендуется для лучшей производительности)
+# CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python>=0.3.0 --force-reinstall --no-cache-dir
+# pip install -r requirements.txt
+
+# ============================================
+# CUDA WHEELS (используйте с --extra-index-url)
+# ============================================
+# Для CUDA 12.1:
+# --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu121
+
+# Для CUDA 11.8:
+# --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu118
+
+# ============================================
+# ОСТАЛЬНЫЕ ЗАВИСИМОСТИ
+# ============================================
+# После установки llama-cpp-python с CUDA, установите остальные зависимости:
+# pip install -r requirements.txt
+
+# ============================================
+# ПРОВЕРКА CUDA ПОДДЕРЖКИ
+# ============================================
+# Запустите этот код чтобы проверить CUDA:
+# python3 << 'EOF'
+# import llama_cpp
+# print("llama-cpp-python version:", llama_cpp.__version__)
+# try:
+#     from llama_cpp import Llama
+#     # Попытка инициализации с GPU
+#     llm = Llama(model_path="test.gguf", n_gpu_layers=1, verbose=True)
+#     print("✅ CUDA поддержка включена!")
+# except Exception as e:
+#     print("❌ CUDA не поддерживается:", e)
+# EOF
+
+# ============================================
+# ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ
+# ============================================
+# Убедитесь что CUDA доступна:
+# export CUDA_HOME=/usr/local/cuda
+# export PATH=$CUDA_HOME/bin:$PATH
+# export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+
+# Проверьте CUDA:
+# nvcc --version
+# nvidia-smi
