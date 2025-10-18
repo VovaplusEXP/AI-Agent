@@ -80,7 +80,6 @@ class Agent:
             n_threads=n_threads,
             n_gpu_layers=n_gpu_layers, 
             flash_attn=flash_attn,
-            offload_kqv=True,   # Загрузка KV-кэша в VRAM (исправлено: было в RAM)
             type_k=1,           # FP16 для ключей KV-кэша
             type_v=1,           # FP16 для значений KV-кэша
             verbose=verbose, 
