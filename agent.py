@@ -14,6 +14,8 @@ load_dotenv()
 import tools
 from context_manager import ContextManager
 from memory import MemoryManager
+from muse_memory import MUSEMemoryManager  # НОВОЕ: MUSE память
+from reflection_agent import ReflectionAgent  # НОВОЕ: Рефлексия
 from chat_manager import ChatManager
 from parsers import parse_response_with_fallback  # v3.0.0: новый парсер с fallback
 from compression import compress_history_smart  # v3.3.0: интеллектуальное сжатие контекста
@@ -51,15 +53,20 @@ class Agent:
         logger.info("Инициализация агента...")
         logger.info(f"Корневая директория проекта: {self.project_root}")
         
-        # Инициализация системы памяти (глобальная + проектные)
+        # Инициализация системы памяти (глобальная + проектные + MUSE)
         # Используем абсолютные пути
         global_memory_path = self.project_root / "memory" / "global"
         chats_abs_path = self.project_root / chats_dir
+        muse_memory_path = self.project_root / "memory" / "muse"  # НОВОЕ: MUSE память
         
         self.memory_manager = MemoryManager(
             global_memory_dir=str(global_memory_path),
             chats_base_dir=str(chats_abs_path)
         )
+        
+        # НОВОЕ: Инициализация MUSE памяти
+        self.muse_memory = MUSEMemoryManager(str(muse_memory_path))
+        logger.info(f"MUSE память инициализирована: {muse_memory_path}")
         
         logger.info("Загрузка GGUF модели...")
         
@@ -93,8 +100,13 @@ class Agent:
         self.context_manager = ContextManager(
             self.llm,
             global_memory=self.memory_manager.global_memory,
-            project_memory=None  # Будет установлена при переключении чата
+            project_memory=None,  # Будет установлена при переключении чата
+            muse_memory=self.muse_memory  # НОВОЕ: MUSE память
         )
+        
+        # НОВОЕ: Инициализация агента рефлексии
+        self.reflection_agent = ReflectionAgent(self.llm)
+        logger.info("Reflection Agent инициализирован")
         
         logger.info("Модель успешно загружена!")
 
@@ -183,6 +195,9 @@ class Agent:
         # Системный промпт будет добавляться в первое user сообщение
         # if not history:
         #     history.append({"role": "system", "content": self.system_prompt})
+        
+        # НОВОЕ: Начинаем отслеживание задачи для рефлексии
+        self.muse_memory.start_task(user_input)
 
         try:
             scratchpad["main_goal"] = user_input
@@ -345,6 +360,8 @@ class Agent:
 
                 # --- ОБРАБОТКА ИНСТРУМЕНТОВ ---
                 result = ""
+                tool_success = False  # НОВОЕ: отслеживание успеха для MUSE
+                
                 if tool_name in self.tools:
                     # v3.3.0: Проверка на дублирование web_fetch
                     if tool_name == "web_fetch" and parameters.get("url"):
@@ -399,6 +416,8 @@ class Agent:
                     logger.debug(f"Тип parameters: {type(parameters)}, содержимое: {repr(parameters)}")
                     try:
                         result = self.tools[tool_name](**parameters)
+                        tool_success = True  # НОВОЕ: инструмент выполнен успешно
+                        
                         if tool_name in self.tools_to_remember and "Ошибка" not in result:
                             # v3.3.0: Сохраняем в память с умным извлечением фактов
                             from compression import _extract_key_facts
@@ -421,6 +440,7 @@ class Agent:
                                 
                     except TypeError as type_error:
                         # v3.1.0: Специальная обработка ошибок типов параметров
+                        tool_success = False  # НОВОЕ: инструмент НЕ выполнен
                         logger.error(f"TypeError в '{tool_name}': {type_error}", exc_info=True)
                         logger.error(f"Переданные параметры (тип: {type(parameters)}): {repr(parameters)}")
                         
@@ -450,6 +470,7 @@ class Agent:
 Попробуй исправить и повтори вызов."""
                         
                     except Exception as e:
+                        tool_success = False  # НОВОЕ: инструмент НЕ выполнен
                         logger.error(f"Ошибка при выполнении '{tool_name}': {e}", exc_info=True)
                         error_msg = str(e)
                         
@@ -574,6 +595,76 @@ no
 
                 elif tool_name == "finish":
                     logger.info("Агент завершил работу.")
+                    
+                    # НОВОЕ: Рефлексия по завершении задачи
+                    logger.info("🤔 Начинается рефлексия...")
+                    success, evaluation, lessons = self.reflection_agent.evaluate_task_completion(
+                        goal=scratchpad['main_goal'],
+                        final_result=parameters.get('final_answer', ''),
+                        trajectory=self.muse_memory.task_trajectory
+                    )
+                    
+                    logger.info(f"📊 Результат рефлексии: {'УСПЕХ' if success else 'НЕУДАЧА'}")
+                    logger.info(f"💬 Оценка: {evaluation}")
+                    
+                    # Завершаем задачу в MUSE памяти
+                    self.muse_memory.finish_task(
+                        success=success,
+                        final_result=parameters.get('final_answer', '')
+                    )
+                    
+                    # Извлекаем стратегические уроки
+                    if lessons:
+                        for lesson in lessons:
+                            self.muse_memory.strategic.add_lesson(
+                                lesson=lesson,
+                                context={'task': scratchpad['main_goal']}
+                            )
+                        logger.info(f"📚 Добавлено стратегических уроков: {len(lessons)}")
+                    
+                    # Извлекаем паттерны использования инструментов
+                    tool_patterns = self.reflection_agent.extract_tool_patterns(
+                        self.muse_memory.task_trajectory
+                    )
+                    for tool, hints in tool_patterns.items():
+                        for hint in hints:
+                            self.muse_memory.tool_memory.add_hint(
+                                tool_name=tool,
+                                hint=hint,
+                                context={'task': scratchpad['main_goal']}
+                            )
+                    if tool_patterns:
+                        logger.info(f"🔧 Добавлено паттернов инструментов: {sum(len(h) for h in tool_patterns.values())}")
+                    
+                    # Анализируем причины ошибок (если были)
+                    failures = self.reflection_agent.identify_failure_causes(
+                        self.muse_memory.task_trajectory
+                    )
+                    for failure in failures:
+                        # Добавляем стратегический урок из ошибки
+                        lesson = f"При использовании {failure['tool']}: избегай {failure['error_type']} ошибок"
+                        self.muse_memory.strategic.add_lesson(
+                            lesson=lesson,
+                            context={
+                                'tool_name': failure['tool'],
+                                'error_type': failure['error_type']
+                            }
+                        )
+                    if failures:
+                        logger.info(f"⚠️ Проанализировано ошибок: {len(failures)}")
+                    
+                    # Проверяем нужно ли сжатие памяти
+                    memory_stats = self.muse_memory.get_stats()
+                    should_compress, reason = self.reflection_agent.should_compress_memory(memory_stats)
+                    
+                    if should_compress:
+                        logger.info(f"🗜️ Запуск сжатия памяти: {reason}")
+                        self.muse_memory.compress_all(self.llm)
+                    
+                    # Сохраняем MUSE память
+                    self.muse_memory.save_all()
+                    logger.info("💾 MUSE память сохранена")
+                    
                     # Автосохранение чата при завершении
                     self.chat_manager.auto_save_chat(
                         self.current_chat,
@@ -595,6 +686,14 @@ no
                 # Формируем Observation для LLM
                 observation_for_llm = f"Observation: Результат выполнения инструмента '{tool_name}':\n{result}"
                 history.append({"role": "user", "content": observation_for_llm})
+                
+                # НОВОЕ: Записываем шаг в MUSE траекторию
+                self.muse_memory.record_step(
+                    tool_name=tool_name,
+                    parameters=parameters,
+                    result=result,
+                    success=tool_success
+                )
             
             logger.warning("Достигнут лимит циклов.")
             
@@ -612,6 +711,10 @@ no
                 project_memory = self.memory_manager.get_project_memory(self.current_chat)
                 project_memory.save()
                 logger.info(f"✅ Память проекта '{self.current_chat}' сохранена (cleanup)")
+                
+                # НОВОЕ: Сохраняем MUSE память
+                self.muse_memory.save_all()
+                logger.info("✅ MUSE память сохранена (cleanup)")
             except Exception as save_error:
                 logger.error(f"❌ Ошибка сохранения памяти в cleanup: {save_error}")
 
@@ -723,5 +826,12 @@ no
             lines.append("\n🔬 Проектные памяти:")
             for name, proj_stats in stats['projects'].items():
                 lines.append(f"  - {name}: {proj_stats['total_entries']} записей")
+        
+        # НОВОЕ: Статистика MUSE памяти
+        muse_stats = self.muse_memory.get_stats()
+        lines.append("\n🧠 MUSE память:")
+        lines.append(f"  - Стратегические уроки: {muse_stats['strategic']['lessons']} (средняя оценка: {muse_stats['strategic']['avg_quality']:.2f})")
+        lines.append(f"  - Процедуры (SOPs): {muse_stats['procedural']['sops']} (успешность: {muse_stats['procedural']['avg_success_rate']*100:.1f}%)")
+        lines.append(f"  - Инструменты с подсказками: {muse_stats['tool_memory']['tools_tracked']} ({muse_stats['tool_memory']['total_hints']} подсказок)")
         
         return "\n".join(lines)

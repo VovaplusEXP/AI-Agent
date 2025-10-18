@@ -18,22 +18,24 @@ class ContextManager:
     - L3 (Долгосрочная память): Векторная память (глобальная + проектная)
     """
     
-    def __init__(self, llm, global_memory=None, project_memory=None, max_tokens=24576):
+    def __init__(self, llm, global_memory=None, project_memory=None, max_tokens=24576, muse_memory=None):
         self.llm = llm
         self.global_memory = global_memory  # Глобальная память (shared)
         self.project_memory = project_memory  # Проектная память (per-chat)
+        self.muse_memory = muse_memory  # НОВОЕ: MUSE память (strategic, procedural, tool)
         self.max_tokens = max_tokens  # v3.3.1: Увеличено с 20480 до 24576 (RTX 4060: 61% → ~72% VRAM)
         
         # НОВЫЙ ПОДХОД: Приоритеты вместо жёстких лимитов
-        # Приоритет 1 (критично, нельзя обрезать): system_prompt, scratchpad
+        # Приоритет 1 (критично, нельзя обрезать): system_prompt, scratchpad, MUSE контекст
         # Приоритет 2 (важно): векторная память
         # Приоритет 3 (можно обрезать): история
         
         self.token_priorities = {
             'system_prompt': {'priority': 1, 'min': 0.10, 'max': 0.20},  # 10-20%
             'l1_scratchpad': {'priority': 1, 'min': 0.05, 'max': 0.15},  # 5-15%
-            'l3_memory':     {'priority': 2, 'min': 0.10, 'max': 0.30},  # 10-30%
-            'l2_history':    {'priority': 3, 'min': 0.30, 'max': 0.70},  # 30-70%
+            'muse_context':  {'priority': 1, 'min': 0.05, 'max': 0.10},  # 5-10% НОВОЕ: MUSE
+            'l3_memory':     {'priority': 2, 'min': 0.10, 'max': 0.25},  # 10-25% (уменьшено для MUSE)
+            'l2_history':    {'priority': 3, 'min': 0.30, 'max': 0.65},  # 30-65% (уменьшено для MUSE)
             'reserve':       {'priority': 4, 'min': 0.05, 'max': 0.10}   # 5-10%
         }
         
@@ -41,8 +43,9 @@ class ContextManager:
         self.token_budget = {
             'system_prompt': 0.15,
             'l1_scratchpad': 0.10,
-            'l3_memory': 0.20,
-            'l2_history': 0.50,
+            'muse_context': 0.07,   # НОВОЕ: бюджет для MUSE контекста
+            'l3_memory': 0.18,      # Уменьшено с 0.20 для MUSE
+            'l2_history': 0.45,     # Уменьшено с 0.50 для MUSE
             'reserve': 0.05
         }
     
@@ -90,23 +93,25 @@ class ContextManager:
         system_prompt: str,
         scratchpad: Dict,
         history: List[Dict],
-        current_query: str
+        current_query: str,
+        current_tool: str = None  # НОВОЕ: текущий инструмент для MUSE подсказок
     ) -> Tuple[List[Dict], Dict, str]:
         """
         Собирает оптимизированный контекст для LLM с АДАПТИВНЫМ распределением токенов.
         
-        Новая логика:
-        1. Приоритет 1 (критично): system_prompt, scratchpad - НЕ обрезаются
+        Новая логика (MUSE):
+        1. Приоритет 1 (критично): system_prompt, scratchpad, MUSE context - НЕ обрезаются
         2. Приоритет 2 (важно): L3 память - адаптивно расширяется если есть место
         3. Приоритет 3 (гибко): L2 история - получает ВСЁ оставшееся место
         4. Перераспределение: свободные токены отдаются по приоритетам
-        5. НОВОЕ: При переполнении конкретного блока - сжимаем его вместо дропа сессии
+        5. При переполнении конкретного блока - сжимаем его вместо дропа сессии
         
         Args:
             system_prompt: Системный промпт
             scratchpad: Рабочая память (план, цель, последнее действие)
             history: История диалога
             current_query: Текущий запрос пользователя
+            current_tool: Текущий инструмент (для MUSE подсказок)
             
         Returns:
             Tuple[оптимизированная история, статистика, улучшенный системный промпт]
@@ -115,6 +120,7 @@ class ContextManager:
             'total_tokens': 0,
             'system_tokens': 0,
             'scratchpad_tokens': 0,
+            'muse_tokens': 0,  # НОВОЕ: токены MUSE контекста
             'memory_tokens': 0,
             'history_tokens': 0,
             'trimmed_messages': 0,
@@ -133,13 +139,18 @@ class ContextManager:
         scratchpad_tokens = self.count_tokens(scratchpad_context)
         stats['scratchpad_tokens'] = scratchpad_tokens
         
+        # 1.3 MUSE контекст (НОВОЕ: НЕЛЬЗЯ обрезать - критичные уроки и процедуры)
+        muse_context = self._build_muse_context(scratchpad, current_query, current_tool)
+        muse_tokens = self.count_tokens(muse_context)
+        stats['muse_tokens'] = muse_tokens
+        
         # === ШАГ 2: Расчёт доступного пространства ===
         
-        critical_tokens = system_tokens + scratchpad_tokens
+        critical_tokens = system_tokens + scratchpad_tokens + muse_tokens
         reserve_tokens = int(self.max_tokens * self.token_priorities['reserve']['min'])
         available_tokens = self.max_tokens - critical_tokens - reserve_tokens
         
-        logger.debug(f"Критичных токенов: {critical_tokens}, доступно: {available_tokens}/{self.max_tokens}")
+        logger.debug(f"Критичных токенов: {critical_tokens} (system: {system_tokens}, scratchpad: {scratchpad_tokens}, MUSE: {muse_tokens}), доступно: {available_tokens}/{self.max_tokens}")
         
         # Проверка переполнения критичных компонентов
         if critical_tokens > self.max_tokens * 0.5:
@@ -196,6 +207,10 @@ class ContextManager:
         
         context_parts = []
         
+        # MUSE контекст (всегда в начале - самый важный)
+        if muse_context:
+            context_parts.append(f"{muse_context}\n")
+        
         if memory_context:
             context_parts.append(f"ДОЛГОСРОЧНАЯ ПАМЯТЬ:\n{memory_context}\n")
         
@@ -236,6 +251,30 @@ class ContextManager:
             parts.append(f"ПОСЛЕДНЕЕ ДЕЙСТВИЕ: {scratchpad['last_action_result'][:200]}...")
         
         return "\n\n".join(parts) if parts else ""
+    
+    def _build_muse_context(self, scratchpad: Dict, current_query: str, current_tool: str = None) -> str:
+        """
+        НОВОЕ: Формирует контекст из MUSE памяти.
+        
+        Args:
+            scratchpad: Рабочая память с текущей задачей
+            current_query: Текущий запрос
+            current_tool: Текущий инструмент (если известен)
+            
+        Returns:
+            Отформатированный MUSE контекст
+        """
+        if not self.muse_memory:
+            return ""
+        
+        # Получаем контекст из MUSE памяти
+        task_description = scratchpad.get('main_goal', current_query)
+        muse_context = self.muse_memory.get_context_for_task(
+            task_description=task_description,
+            current_tool=current_tool
+        )
+        
+        return muse_context
     
     def _build_memory_context(self, query: str, scratchpad: Dict) -> str:
         """УСТАРЕВШИЙ метод для обратной совместимости. Использует _build_memory_context_adaptive."""
