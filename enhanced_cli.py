@@ -26,7 +26,10 @@ from rich.table import Table
 from rich.syntax import Syntax
 from rich.align import Align
 from rich.text import Text
+from rich.spinner import Spinner
+from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich import box
+import time
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import FileHistory
@@ -39,6 +42,67 @@ from agent import Agent
 MODEL_PATH = "/home/vova/AI/ai/gemma-3n-E4B-it-IQ4_XS.gguf"
 HISTORY_FILE = ".chat_history"
 CHATS_DIR = "chats"
+
+
+class ToolStatsTracker:
+    """Отслеживание статистики использования инструментов"""
+    
+    def __init__(self):
+        self.tool_stats = {}  # {tool_name: {'count': int, 'success': int, 'total_time': float}}
+        self.start_time = None
+    
+    def start_tool(self, tool_name: str):
+        """Начать отслеживание вызова инструмента"""
+        self.start_time = time.time()
+    
+    def end_tool(self, tool_name: str, success: bool):
+        """Завершить отслеживание вызова инструмента"""
+        elapsed = time.time() - self.start_time if self.start_time else 0
+        
+        if tool_name not in self.tool_stats:
+            self.tool_stats[tool_name] = {'count': 0, 'success': 0, 'total_time': 0.0}
+        
+        self.tool_stats[tool_name]['count'] += 1
+        if success:
+            self.tool_stats[tool_name]['success'] += 1
+        self.tool_stats[tool_name]['total_time'] += elapsed
+        self.start_time = None
+    
+    def get_stats(self) -> Dict[str, Dict[str, Any]]:
+        """Получить статистику по всем инструментам"""
+        return self.tool_stats
+    
+    def render_stats(self, console: Console):
+        """Отобразить статистику инструментов"""
+        if not self.tool_stats:
+            return
+        
+        table = Table(title="Tool Statistics", box=box.ROUNDED)
+        table.add_column("Tool", style="cyan")
+        table.add_column("Calls", justify="right")
+        table.add_column("Success Rate", justify="right")
+        table.add_column("Avg Time", justify="right")
+        
+        for tool_name, stats in sorted(self.tool_stats.items()):
+            success_rate = (stats['success'] / stats['count'] * 100) if stats['count'] > 0 else 0
+            avg_time = (stats['total_time'] / stats['count']) if stats['count'] > 0 else 0
+            
+            # Цветовая индикация success rate
+            if success_rate >= 90:
+                rate_color = "green"
+            elif success_rate >= 70:
+                rate_color = "yellow"
+            else:
+                rate_color = "red"
+            
+            table.add_row(
+                tool_name,
+                str(stats['count']),
+                f"[{rate_color}]{success_rate:.1f}%[/{rate_color}]",
+                f"{avg_time:.2f}s"
+            )
+        
+        console.print(table)
 
 
 class EnhancedStatusBar:
@@ -228,9 +292,13 @@ class EnhancedCLI:
         self.agent = Agent(model_path=model_path, chats_dir=chats_dir)
         self.status_bar = EnhancedStatusBar(self.agent)
         self.code_preview = CodePreviewDialog(self.console, self.session)
+        self.tool_tracker = ToolStatsTracker()
         
         # Для отслеживания последней статистики контекста
         self.agent.last_context_stats = {'total_tokens': 0}
+        
+        # Для отслеживания времени сессии
+        self.session_start_time = time.time()
 
     def show_welcome(self):
         """Показывает красивый экран приветствия"""
@@ -298,6 +366,7 @@ class EnhancedCLI:
         help_content.add_row("[bold]Memory & Stats[/bold]", "")
         help_content.add_row("/memory", "Show memory statistics")
         help_content.add_row("/status", "Show detailed status")
+        help_content.add_row("/stats", "Show session & tool statistics")
         
         # Прочее
         help_content.add_row("", "")
@@ -315,6 +384,49 @@ class EnhancedCLI:
     def show_status(self):
         """Показывает детальный статус"""
         self.console.print(self.status_bar.render())
+    
+    def show_session_stats(self):
+        """Показывает статистику сессии"""
+        session_duration = time.time() - self.session_start_time
+        
+        # Создаем панель со статистикой сессии
+        stats_table = Table.grid(padding=(0, 2))
+        stats_table.add_column(style="cyan", justify="right")
+        stats_table.add_column(style="white")
+        
+        # Форматируем время
+        hours = int(session_duration // 3600)
+        minutes = int((session_duration % 3600) // 60)
+        seconds = int(session_duration % 60)
+        
+        if hours > 0:
+            duration_str = f"{hours}h {minutes}m {seconds}s"
+        elif minutes > 0:
+            duration_str = f"{minutes}m {seconds}s"
+        else:
+            duration_str = f"{seconds}s"
+        
+        stats_table.add_row("Session Duration:", duration_str)
+        stats_table.add_row("Current Chat:", self.agent.current_chat)
+        
+        # Получаем данные о контексте и памяти
+        current_tokens, max_tokens, free_percent = self.status_bar.get_context_usage()
+        mem_mb, mem_str = self.status_bar.get_memory_usage()
+        
+        stats_table.add_row("Context Usage:", f"{current_tokens:,}/{max_tokens:,} tokens ({free_percent:.0f}% free)")
+        stats_table.add_row("Memory Usage:", mem_str)
+        
+        self.console.print(Panel(
+            stats_table,
+            title="[bold cyan]Session Statistics[/bold cyan]",
+            border_style="cyan",
+            box=box.ROUNDED
+        ))
+        
+        # Показываем статистику инструментов, если есть
+        if self.tool_tracker.tool_stats:
+            self.console.print()
+            self.tool_tracker.render_stats(self.console)
 
     def handle_command(self, user_input: str):
         """Обрабатывает команды пользователя"""
@@ -356,6 +468,9 @@ class EnhancedCLI:
             
         elif command == '/status':
             self.show_status()
+        
+        elif command == '/stats':
+            self.show_session_stats()
             
         elif command == '/help':
             self.show_help()
@@ -461,7 +576,9 @@ class EnhancedCLI:
                 agent_generator = self.agent.run_cycle(user_input)
                 
                 try:
-                    agent_step = next(agent_generator)
+                    # Показываем spinner во время ожидания первого ответа
+                    with self.console.status("[cyan]Agent thinking...[/cyan]", spinner="dots") as status:
+                        agent_step = next(agent_generator)
 
                     while True:
                         thought = agent_step['thought']
@@ -535,7 +652,15 @@ class EnhancedCLI:
 
                         # Отправка сигнала и получение следующего шага
                         if should_proceed:
-                            agent_step = agent_generator.send(True)
+                            # Начинаем отслеживание времени выполнения инструмента
+                            self.tool_tracker.start_tool(tool_name)
+                            
+                            # Показываем spinner во время выполнения
+                            with self.console.status(f"[cyan]Executing {tool_name}...[/cyan]", spinner="dots"):
+                                agent_step = agent_generator.send(True)
+                            
+                            # Записываем результат (предполагаем успех, если нет исключения)
+                            self.tool_tracker.end_tool(tool_name, True)
                         else:
                             agent_step = agent_generator.send(False)
                             self.console.print("[red]✗ Action cancelled[/red]")

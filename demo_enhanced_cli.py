@@ -179,6 +179,27 @@ python hello.py
     ))
 
 
+def demo_tool_stats():
+    """Демонстрация статистики инструментов"""
+    console.print("\n[bold]Tool Statistics:[/bold]\n")
+    
+    table = Table(title="Tool Statistics", box=box.ROUNDED)
+    table.add_column("Tool", style="cyan")
+    table.add_column("Calls", justify="right")
+    table.add_column("Success Rate", justify="right")
+    table.add_column("Avg Time", justify="right")
+    
+    # Примеры данных
+    table.add_row("write_file", "5", "[green]100.0%[/green]", "0.15s")
+    table.add_row("read_file", "8", "[green]100.0%[/green]", "0.08s")
+    table.add_row("internet_search", "3", "[yellow]66.7%[/yellow]", "2.34s")
+    table.add_row("web_fetch", "2", "[green]100.0%[/green]", "1.82s")
+    table.add_row("analyze_code", "1", "[green]100.0%[/green]", "0.92s")
+    
+    console.print(table)
+    console.print()
+
+
 def demo_status_colors():
     """Демонстрация цветовых индикаторов"""
     console.print("\n[bold]Цветовые Индикаторы Состояния:[/bold]\n")
@@ -236,6 +257,7 @@ def demo_commands_help():
     help_content.add_row("[bold]Memory & Stats[/bold]", "")
     help_content.add_row("/memory", "Show memory statistics")
     help_content.add_row("/status", "Show detailed status")
+    help_content.add_row("/stats", "Show session & tool stats")
     
     # Прочее
     help_content.add_row("", "")
@@ -296,10 +318,17 @@ def run_demo():
     demo_status_colors()
     time.sleep(2)
     
+    input("\nНажмите Enter для статистики инструментов...")
+    
+    # 7. Статистика инструментов
+    console.print("\n[bold cyan]7. Статистика Инструментов[/bold cyan]")
+    demo_tool_stats()
+    time.sleep(2)
+    
     input("\nНажмите Enter для справки по командам...")
     
-    # 7. Справка
-    console.print("\n[bold cyan]7. Справка по Командам[/bold cyan]\n")
+    # 8. Справка
+    console.print("\n[bold cyan]8. Справка по Командам[/bold cyan]\n")
     demo_commands_help()
     
     console.print("\n[bold green]✓ Демонстрация завершена![/bold green]")
