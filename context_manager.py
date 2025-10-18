@@ -213,6 +213,9 @@ class ContextManager:
         stats['total_tokens'] = used_tokens + history_tokens
         stats['utilization'] = (stats['total_tokens'] / self.max_tokens) * 100
         
+        # Сохраняем статистику для Enhanced CLI
+        self.last_build_stats = stats
+        
         logger.debug(f"✅ Контекст собран: {stats['total_tokens']}/{self.max_tokens} токенов ({stats['utilization']:.1f}% использовано)")
         if blocks_compressed > 0:
             logger.info(f"🗜️ Сжато блоков при переполнении: {blocks_compressed}")
