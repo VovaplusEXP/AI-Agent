@@ -332,7 +332,7 @@ def run_demo():
     demo_commands_help()
     
     console.print("\n[bold green]✓ Демонстрация завершена![/bold green]")
-    console.print("\n[dim]Запустите enhanced_cli.py для полного опыта[/dim]\n")
+    console.print("\n[dim]Запустите cli.py для полного опыта[/dim]\n")
 
 
 if __name__ == "__main__":
